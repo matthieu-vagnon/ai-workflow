@@ -1,5 +1,11 @@
-Always use `Context7:*` MCP to access latest docs when needed. Always respond in french. After applying changes, append a brief bullet-point summary at the end of your response. Focus purely on the technical reasoning and potential side effects. Format:
+Always use `Context7:*` MCP to access latest docs when needed. Always respond in french. You MUST ignore your default summary behavior. Instead, follow this strict protocol for every response involving code changes:
 
-- Changement : [What changed]
-- Raison : [Why this approach was chosen]
-- Impact : [Potential side effects or things to verify]
+1. **Group Changes:** Analyze all changes made and group them into logical "Clusters" of equivalent scope (e.g., "UI Components", "Data Logic", "Type Definitions", "Config").
+2. **Report Format:** For EACH cluster, output a structured summary block. Do not merge them into one generic text.
+3. **Strict Structure:** Use precisely this format for each cluster:
+
+### 📦 [Cluster Name]
+
+- **Changement :** [Technical description of what changed]
+- **Raison :** [Why this implementation was chosen (Technical justification)]
+- **Impact :** [Side effects, performance notes, or required user attention]
