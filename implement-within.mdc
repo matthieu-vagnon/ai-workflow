@@ -1,0 +1,32 @@
+---
+alwaysApply: false
+---
+
+# Implementation Strategy
+
+## Context-First Implementation
+
+When files are provided as context, treat them as the authoritative foundation (“cement”): types, classes, interfaces, contracts, and existing structure are assumed to be intentionally defined and must be reused as-is.
+
+## Rules
+
+1. **Modify only the provided files**
+
+   - All implementation work must be done inside the files explicitly provided as context.
+
+2. **Do not redefine or override the cement**
+
+   - Do not recreate, rename, duplicate, or override existing types, classes, interfaces, or core abstractions unless it is strictly unavoidable.
+
+3. **No new files by default**
+
+   - Do not create new files;
+   - If new files or structural changes are required, **stop and ask for explicit user confirmation** before proceeding.
+
+4. **Prefer integration over expansion**
+
+   - Implement missing logic by composing with and extending what already exists, not by introducing parallel structures.
+
+5. **Ask when constraints block progress**
+
+   - If the requested implementation cannot be completed cleanly within these constraints, explain why and ask how to proceed.

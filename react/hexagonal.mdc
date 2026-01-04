@@ -1,5 +1,6 @@
 ---
-alwaysApply: true
+description: Frontend coding instructions.
+alwaysApply: false
 ---
 
 # General Coding Instructions
@@ -89,8 +90,6 @@ You are a React.js expert. You need to develop a React.js application following 
 - **State management**:
   - Local state with `useState` for component-specific state
   - `useReducer` for complex state logic
-  - Context + hooks for shared state (avoid prop drilling)
-  - External state management (Zustand, Jotai) for global state if needed
 - **Performance**:
   - `React.memo` for expensive components (measure first)
   - `useMemo` for expensive computations
@@ -98,17 +97,9 @@ You are a React.js expert. You need to develop a React.js application following 
   - Lazy loading with `React.lazy` and `Suspense`
   - Virtual scrolling for long lists (react-window, @tanstack/react-virtual)
 - **Error handling**:
-  - Error boundaries for component errors
-  - Try-catch in async operations
   - Loading and error states in hooks
-- **Styling**:
-  - Tailwind CSS (utility-first, recommended)
-  - CSS Modules (scoped styles)
-  - Styled-components (CSS-in-JS)
-  - Avoid inline styles (except dynamic values)
 - **Responsive Design**:
   - **Mobile-first approach**: Design for mobile, then scale up
-  - **Tailwind breakpoints**: `sm:`, `md:`, `lg:`, `xl:`, `2xl:` (use consistently)
   - **Fluid typography**: Use `clamp()` for responsive font sizes
   - **Responsive images**:
     - Use `<picture>` for art direction
@@ -116,7 +107,6 @@ You are a React.js expert. You need to develop a React.js application following 
     - Lazy loading with `loading="lazy"`
   - **Container queries**: Use `@container` for component-level responsiveness
   - **Touch targets**: Minimum 44x44px for interactive elements (mobile)
-  - **Responsive spacing**: Use Tailwind spacing scale consistently
   - **Test on real devices**: Don't rely only on browser DevTools
   - **Breakpoint strategy**:
     - Mobile: < 640px (sm)
@@ -133,14 +123,10 @@ You are a React.js expert. You need to develop a React.js application following 
 
 ### Domain Layer Rules
 
-- **Pure TypeScript**: No React imports, no JSX, no hooks
+- **Pure TypeScript**: No React imports except data validation, no JSX, no hooks
 - **Entities**: Simple classes or interfaces representing business models
 - **Ports**: Interfaces defining contracts (repository, service)
 - **Business logic**: Pure functions in `lib/`
-- **Validation**: Use **Zod** for schema validation and type inference
-  - Define schemas in domain entities
-  - Use `z.infer<typeof schema>` for type extraction
-  - Validate data at boundaries (API responses, user inputs)
 - **No side effects**: Domain should be testable without UI
 
 ### Application Layer Rules
@@ -167,8 +153,6 @@ You are a React.js expert. You need to develop a React.js application following 
 
 ### Testing
 
-- **Bun test** for unit tests (built-in, fast)
-- **React Testing Library** for component tests
 - **Test principles**:
   - Test behavior, not implementation
   - Query by accessible elements (getByRole, getByLabelText)
@@ -176,7 +160,6 @@ You are a React.js expert. You need to develop a React.js application following 
   - Mock external dependencies (API, storage)
 - **Test doubles** for domain ports (mock repositories)
 - **Coverage**: Minimum 70% for critical business logic
-- Use **Zod schemas** in tests for data validation
 
 ### File Naming Conventions
 
@@ -191,7 +174,7 @@ You are a React.js expert. You need to develop a React.js application following 
 ### Architecture
 
 - [ ] 3 distinct layers: domain / application / infrastructure
-- [ ] Domain is pure TypeScript (no React dependencies)
+- [ ] Domain is pure TypeScript (no React dependencies except data validation)
 - [ ] Application layer uses domain through custom hooks
 - [ ] Infrastructure implements domain ports
 
@@ -218,43 +201,3 @@ You are a React.js expert. You need to develop a React.js application following 
 - [ ] Performance optimization (measured, not premature)
 - [ ] Responsive design (mobile-first, tested on real devices)
 - [ ] Accessible (ARIA labels, keyboard navigation, semantic HTML)
-
-### Testing
-
-- [ ] Unit tests for domain logic
-- [ ] Component tests with React Testing Library
-- [ ] Mock infrastructure adapters
-- [ ] Coverage ≥ 70%
-
-### DevOps
-
-- [ ] GitHub Actions CI/CD (tests, linting, build)
-- [ ] Biome for linting and formatting
-- [ ] TypeScript compiler checks in CI
-- [ ] Docker for deployment (optional)
-
-## Absolutely Avoid
-
-- ❌ React imports in domain layer (no hooks, no JSX, no components)
-- ❌ Direct API calls in components (use hooks that consume domain)
-- ❌ Prop drilling (use composition or context)
-- ❌ Class components (use functional components)
-- ❌ `any` type (use `unknown` or proper types)
-- ❌ Premature optimization (measure first)
-- ❌ God components (>300 lines, do everything)
-- ❌ Testing implementation details (test behavior)
-- ❌ Fixed pixel widths (use responsive units: %, rem, vw/vh)
-- ❌ Desktop-only designs (mobile traffic is 50%+ globally)
-- ❌ Ignoring touch interactions (hover states don't work on mobile)
-- ❌ Tiny touch targets (<44px on mobile)
-
-## Critical Reminders
-
-1. **Domain** = pure TypeScript, zero React dependencies
-2. **Application** consumes domain via **custom hooks**
-3. **Infrastructure** implements **domain ports** (adapters pattern)
-4. Use **TypeScript strict mode** with explicit types everywhere
-5. **Test behavior, not implementation** with React Testing Library
-6. **Mobile-first responsive design** with Tailwind breakpoints
-7. **Touch targets** minimum 44x44px on mobile
-8. SOLID + KISS: simplicity and design principles above all

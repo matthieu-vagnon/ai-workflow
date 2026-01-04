@@ -8,9 +8,9 @@ alwaysApply: true
 
 - **Package Manager**: pnpm, npm, bun
 - **Code Quality**: ESLint, Prettier
-- **Testing**: Jest
+- **Version Control**: Git
 - **Containerization**: Docker
-- **Deployment**: Vercel, Google Cloud Run
+- **Deployment**: Vercel, Google Cloud
 - **CI/CD**: GitHub Actions, GitLab CI
 
 ## Frontend
@@ -26,6 +26,7 @@ alwaysApply: true
 - **Error Handling**: Effect, try/catch
 - **Internationalization**: React i18next, Next Intl
 - **Observability**: PostHog
+- **Testing**: Jest, React Testing Library
 - **Other Dependencies**: Lucide, lucide-animated, LDRS, useWorker
 
 ## Backend
@@ -43,4 +44,5 @@ alwaysApply: true
 - **Caching**: Redis, Upstash
 - **Logging**: Pino
 - **Documentation**: OpenAPI/Swagger
-- **Other Dependencies**: OpenRouter API, Exa API
+- **Testing**: Jest
+- **Other Dependencies**: OpenRouter API, Exa API, RapidAPI
