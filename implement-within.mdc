@@ -8,6 +8,25 @@ alwaysApply: false
 
 When files are provided as context, treat them as the authoritative foundation (“cement”): types, classes, interfaces, contracts, and existing structure are assumed to be intentionally defined and must be reused as-is.
 
+## Strategy
+
+1. **Analyze the context**
+
+   - Read the provided files carefully to understand the existing codebase and its architecture;
+   - Read the design patterns and principles.
+
+2. **Plan the implementation**
+
+   - Understand the request and ask for clarification if needed;
+   - Plan the steps required to complete the implementation.
+
+3. **Implement the feature following the following principles**
+
+   - Respect the existing codebase and its architecture;
+   - Follow the design patterns and principles;
+   - Follow the SOLID principles;
+   - Follow the KISS principle.
+
 ## Rules
 
 1. **Modify only the provided files**
