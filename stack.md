@@ -33,7 +33,7 @@
 
 ## Backend
 
-- **Framework**: Fastify
+- **Framework**: Fastify, NestJS
 - **Language**: TypeScript
 - **Runtime**: Node.js
 - **Package Manager**: pnpm, npm
