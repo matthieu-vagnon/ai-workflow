@@ -88,7 +88,10 @@ async function main() {
     for (const file of fs.readdirSync(rulesDir)) {
       if (!file.endsWith(".md")) continue;
       if (shouldIncludeRule(file, selectedTechs)) {
-        linkOrCopy(
+        const isGenericRule = isGeneric(file);
+        // Generic rules are always copied (not symlinked) to allow customization
+        const action = isGenericRule ? copyPath : linkOrCopy;
+        action(
           path.join(rulesDir, file),
           path.join(targetPath, ".opencode", "rules", file),
         );
@@ -167,6 +170,11 @@ function shouldIncludeRule(filename, selectedTechs) {
   const name = filename.replace(".md", "");
   if (GENERIC_RULES.includes(name)) return true;
   return selectedTechs.some((tech) => name.startsWith(`${tech}-`));
+}
+
+function isGeneric(filename) {
+  const name = filename.replace(".md", "");
+  return GENERIC_RULES.includes(name);
 }
 
 function removePath(target) {
