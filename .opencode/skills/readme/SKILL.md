@@ -1,7 +1,6 @@
 ---
 name: readme
 description: Generates or updates the project README.md by analyzing the structure and configuration files.
-argument-hint: "[create|update]"
 ---
 
 # README Generator Skill
@@ -86,6 +85,3 @@ MIT (or other)
 - **Never invent** features not present in the code;
 - **Preserve** existing custom sections (Contributing, Acknowledgments, etc.);
 - **Adapt** the structure based on project type (lib, app, monorepo);
-- If `$ARGUMENTS` = "create": generate a new README;
-- If `$ARGUMENTS` = "update": update while preserving existing content;
-- Without argument: auto-detect (update if exists, create otherwise).
