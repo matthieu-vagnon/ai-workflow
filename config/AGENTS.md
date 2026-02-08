@@ -18,12 +18,14 @@ Before writing or modifying code that uses any external library:
 ### Documentation & Logging
 
 - Write TSDoc/docstrings ONLY for **exported** functions, classes, types, and interfaces;
-- DO NOT add inline comments or logs unless explicitly requested.
+- DO NOT add inline comments or logs unless explicitly requested;
+- Generic code (style variables, UI components, etc.) should ALWAYS be reusable.
 
 ## After Writing Code
 
 Verify the following checklist. Iterate until complete:
 
+- [ ] Generic code is reusable
 - [ ] No code was duplicated
 - [ ] No logs were added without prior consent
 - [ ] `README.md` is still up to date
