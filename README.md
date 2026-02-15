@@ -2,10 +2,6 @@
 
 Configuration and conventions to optimize AI coding assistants on TypeScript/React projects.
 
-## Features
-
-![Features Illustration](./.github/assets/readme-illustration.png)
-
 ## Tech Stack Coverage
 
 | Category | Technologies                                              |
@@ -44,30 +40,41 @@ node bootstrap.mjs ~/projects/my-app
 The script prompts you to:
 
 1. **Select technologies**: Choose React and/or TypeScript to filter relevant rules
-2. **Choose mode**: Symlinks (recommended) or copy files
-3. **Gitignore handling**: Add entries to ignore or create exceptions
-4. **Select target tool**: Claude Code or OpenCode
+2. **Select architecture**: Optional (e.g., Hexagonal)
+3. **Choose mode**: Symlinks (recommended) or copy files
+4. **Gitignore handling**: Add entries to ignore or create exceptions
+5. **Select target tools**: One or more tools (Claude Code, OpenCode, Cursor, Codex)
 
 ```
-OpenCode Workflow → /Users/you/projects/my-app
+AI Workflow → /Users/you/projects/my-app
 
-? Select technologies
-  [ ] React - Components, hooks, patterns
-  [x] TypeScript - Conventions, testing
+◆ Select technologies
+│ [ ] React - Components, hooks, patterns
+│ [x] TypeScript - Conventions, testing
 
-? Use symlinks? (No = copy files) Yes
+◆ Select custom architecture
+│ ● None
 
-? Gitignore handling? Add to .gitignore
+◆ Use symlinks? Yes
 
-? Select target tool Claude Code
+◆ Select target tools
+│ [x] Claude Code
+│ [x] Cursor
+│ [ ] OpenCode
+│ [ ] Codex
 
-Summary
-  Rules:         3 linked
-  Skills:        3 linked
-  Agents:        0 linked
-  CLAUDE.md:     linked
-  .mcp.json:     copied
-  .gitignore:    entries added
+◇ Claude Code Setup
+│ Rules:      2 linked
+│ Skills:     1 linked
+│ Agents:     0 linked
+│ CLAUDE.md:  linked
+│ .mcp.json:  copied
+│ .gitignore: entries added
+
+◇ Cursor Setup
+│ Rules:      2 linked
+│ .cursor/mcp.json: copied
+│ .gitignore: entries added
 
 Done
 ```
@@ -77,35 +84,42 @@ Done
 ```
 config/
 ├── rules/
-│   ├── ts-conventions.md              # TypeScript conventions
-│   ├── react-conventions.md           # React component patterns
-│   └── react-hexagonal-architecture.md # Hexagonal architecture
+│   ├── project.md                        # Generic project rules (always copied)
+│   └── react-hexagonal-architecture.md   # Hexagonal architecture for React
 ├── skills/
-│   ├── readme-writing/     # README generation
-│   ├── implement-within/   # Context-first implementation strategy
-│   └── ts-test-writing/    # Testing guidelines
-├── agents/                 # Custom agents (optional)
-├── AGENTS.md               # Master rules for all agents
-├── claudecode.settings.json # Claude Code configuration
-└── opencode.settings.json   # OpenCode configuration
+│   └── readme-writing/                   # README generation
+├── agents/                               # Custom agents (optional)
+├── AGENTS.md                             # Master rules for all agents
+├── claudecode.settings.json              # Claude Code MCP config
+├── opencode.settings.json                # OpenCode MCP config
+├── cursor.mcp.json                       # Cursor MCP config
+└── codex.config.toml                     # Codex MCP config (TOML)
 
-bootstrap.mjs               # Node.js setup script
+bootstrap.mjs                             # Node.js setup script
 ```
 
 ## Supported Tools
 
-| Tool        | Config File     | Root File   | Directory    |
-| ----------- | --------------- | ----------- | ------------ |
-| Claude Code | `.mcp.json`     | `CLAUDE.md` | `.claude/`   |
-| OpenCode    | `opencode.json` | `AGENTS.md` | `.opencode/` |
+![Features Illustration](./.github/assets/readme-illustration.png)
+
+| Tool        | Rules              | Skills/Agents                            | Root File   | Config File          |
+| ----------- | ------------------ | ---------------------------------------- | ----------- | -------------------- |
+| Claude Code | `.claude/rules/`   | `.claude/skills/`, `.claude/agents/`     | `CLAUDE.md` | `.mcp.json`          |
+| OpenCode    | `.opencode/rules/` | `.opencode/skills/`, `.opencode/agents/` | `AGENTS.md` | `opencode.json`      |
+| Cursor      | `.cursor/rules/`   | —                                        | —           | `.cursor/mcp.json`   |
+| Codex       | —                  | —                                        | `AGENTS.md` | `.codex/config.toml` |
 
 ## Rule Filtering
 
-| Selection  | Rules Included           |
-| ---------- | ------------------------ |
-| React      | `react-*.md`             |
-| TypeScript | `ts-*.md`                |
-| Both       | `react-*.md` + `ts-*.md` |
+Items without a technology or architecture prefix are considered generic and always included.
+
+| Selection    | Rules Included                         |
+| ------------ | -------------------------------------- |
+| None         | Generic rules only (`project.md`)      |
+| React        | Generic + `react-*.md`                 |
+| TypeScript   | Generic + `ts-*.md`                    |
+| Hexagonal    | Generic + items containing `hexagonal` |
+| React + Both | Generic + `react-*.md` + `ts-*.md`     |
 
 ## Symlinks vs Copy
 
@@ -114,13 +128,7 @@ bootstrap.mjs               # Node.js setup script
 | Symlinks | Centralized updates, no duplication | Requires source repo presence |
 | Copy     | Self-contained, portable            | Manual updates needed         |
 
-## Available Skills
-
-| Skill              | Description                                                             |
-| ------------------ | ----------------------------------------------------------------------- |
-| `readme-writing`   | Generates or updates the project README.md                              |
-| `implement-within` | Context-first implementation strategy for modifying only provided files |
-| `ts-test-writing`  | Testing guidelines and patterns for TypeScript tests                    |
+Items listed in `COPIED_RULES`, `COPIED_SKILLS`, or `COPIED_AGENTS` are always copied (never symlinked) to allow per-project customization.
 
 ## Manual Installation
 
@@ -129,7 +137,3 @@ If you prefer not to use the bootstrap script:
 1. Copy the `config/` folder contents to your project
 2. Rename files according to your target tool (see Supported Tools table)
 3. Update `.gitignore` as needed
-
-## License
-
-MIT

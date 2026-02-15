@@ -11,60 +11,36 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // CONFIGURATION
 // =============================================================================
 
-/**
- * Available technologies for filtering rules/skills/agents.
- * Items with matching prefix (e.g., "react-*") will be included.
- */
+// Technologies filter items by prefix (e.g., "react-*" matches "react-components")
 const TECHNOLOGIES = [
   { value: "react", label: "React", hint: "Components, hooks, patterns" },
   { value: "ts", label: "TypeScript", hint: "Conventions, testing" },
 ];
 
-/**
- * Available architectures for filtering rules/skills/agents.
- * Items containing the architecture name anywhere will be included.
- */
+// Architectures filter items by substring match
 const ARCHITECTURES = [
   { value: "none", label: "None", hint: "No custom architecture" },
   { value: "hexagonal", label: "Hexagonal", hint: "Ports & adapters pattern" },
 ];
 
-/**
- * Generic items included regardless of technology/architecture selection.
- */
-const GENERIC_RULES = ["project"];
-const GENERIC_SKILLS = ["readme-writing", "implement-within"];
-const GENERIC_AGENTS = [];
+// Items always copied (never symlinked) to allow per-project customization
+const COPIED_RULES = ["project"];
+const COPIED_SKILLS = [];
+const COPIED_AGENTS = [];
 
-/**
- * Tool configurations define the directory structure for each supported IDE tool.
- * Each tool specifies where rules, skills, agents, and config files should be placed.
- */
+// Tool definitions: directory structure, root files, config files, gitignore
 const TOOLS = {
   claudecode: {
     value: "claudecode",
     label: "Claude Code",
     hint: "Anthropic's CLI for Claude",
-
-    // Target directory structure in the project
     paths: {
       rules: ".claude/rules",
       skills: ".claude/skills",
       agents: ".claude/agents",
     },
-
-    // Root-level files to copy/link
-    rootFiles: {
-      "AGENTS.md": "CLAUDE.md",
-    },
-
-    // Config files to always copy (never symlink)
-    // Format: "source-file-in-config-folder": "target-path-in-project"
-    configFiles: {
-      "claudecode.settings.json": ".mcp.json",
-    },
-
-    // Entries to add to .gitignore
+    rootFiles: { "AGENTS.md": "CLAUDE.md" },
+    configFiles: { "claudecode.settings.json": ".mcp.json" },
     gitignoreEntries: [".claude", "CLAUDE.md", ".mcp.json"],
   },
 
@@ -72,27 +48,36 @@ const TOOLS = {
     value: "opencode",
     label: "OpenCode",
     hint: "Open-source AI coding assistant",
-
-    // Target directory structure in the project
     paths: {
       rules: ".opencode/rules",
       skills: ".opencode/skills",
       agents: ".opencode/agents",
     },
-
-    // Root-level files to copy/link
-    rootFiles: {
-      "AGENTS.md": "AGENTS.md",
-    },
-
-    // Config files to always copy (never symlink)
-    // Format: "source-file-in-config-folder": "target-path-in-project"
-    configFiles: {
-      "opencode.settings.json": "opencode.json",
-    },
-
-    // Entries to add to .gitignore
+    rootFiles: { "AGENTS.md": "AGENTS.md" },
+    configFiles: { "opencode.settings.json": "opencode.json" },
     gitignoreEntries: [".opencode", "AGENTS.md", "opencode.json"],
+  },
+
+  cursor: {
+    value: "cursor",
+    label: "Cursor",
+    hint: "AI-powered code editor",
+    paths: {
+      rules: ".cursor/rules",
+    },
+    rootFiles: {},
+    configFiles: { "cursor.mcp.json": ".cursor/mcp.json" },
+    gitignoreEntries: [".cursor"],
+  },
+
+  codex: {
+    value: "codex",
+    label: "Codex",
+    hint: "OpenAI's coding agent CLI",
+    paths: {},
+    rootFiles: { "AGENTS.md": "AGENTS.md" },
+    configFiles: { "codex.config.toml": ".codex/config.toml" },
+    gitignoreEntries: [".codex", "AGENTS.md"],
   },
 };
 
@@ -122,8 +107,7 @@ async function main() {
   }
 
   console.clear();
-
-  p.intro(`OpenCode Workflow → ${targetPath}`);
+  p.intro(`AI Workflow → ${targetPath}`);
 
   const config = await p.group(
     {
@@ -148,10 +132,8 @@ async function main() {
         }),
 
       gitignoreMode: ({ results }) => {
-        // Symlinks must be gitignored (GitHub doesn't support symlinks)
-        if (results.useSymlinks) {
-          return Promise.resolve("add");
-        }
+        if (results.useSymlinks) return Promise.resolve("add");
+
         return p.select({
           message: "Gitignore handling?",
           options: [
@@ -169,14 +151,15 @@ async function main() {
         });
       },
 
-      tool: () =>
-        p.select({
-          message: "Select target tool",
+      tools: () =>
+        p.multiselect({
+          message: "Select target tools",
           options: Object.values(TOOLS).map((t) => ({
             value: t.value,
             label: t.label,
             hint: t.hint,
           })),
+          required: true,
         }),
     },
     {
@@ -191,129 +174,91 @@ async function main() {
   const selectedArchs = config.archs ? [config.archs] : [];
   const useSymlinks = config.useSymlinks;
   const gitignoreMode = config.gitignoreMode;
-  const selectedTool = TOOLS[config.tool];
+  const selectedTools = config.tools.map((key) => TOOLS[key]);
   const linkOrCopy = useSymlinks ? createSymlink : copyPath;
 
   const s = p.spinner();
   s.start(useSymlinks ? "Creating symlinks" : "Copying files");
 
-  const stats = { rules: 0, skills: 0, agents: 0 };
+  const mode = useSymlinks ? "linked" : "copied";
+  const summaryLines = [];
 
-  // Create directories based on tool configuration
-  const { paths } = selectedTool;
-  if (paths.rules) {
-    fs.mkdirSync(path.join(targetPath, paths.rules), { recursive: true });
-  }
-  if (paths.skills) {
-    fs.mkdirSync(path.join(targetPath, paths.skills), { recursive: true });
-  }
-  if (paths.agents) {
-    fs.mkdirSync(path.join(targetPath, paths.agents), { recursive: true });
-  }
+  for (const tool of selectedTools) {
+    const stats = { rules: 0, skills: 0, agents: 0 };
+    const { paths } = tool;
 
-  // Link/copy rules
-  const rulesDir = path.join(__dirname, "config", "rules");
-  if (fs.existsSync(rulesDir) && paths.rules) {
-    for (const file of fs.readdirSync(rulesDir)) {
-      if (!file.endsWith(".md")) continue;
-      if (shouldIncludeRule(file, selectedTechs, selectedArchs)) {
-        const isGenericRule = isGeneric(file);
-        // Generic rules are always copied (not symlinked) to allow customization
-        const action = isGenericRule ? copyPath : linkOrCopy;
-        action(
-          path.join(rulesDir, file),
-          path.join(targetPath, paths.rules, file),
-        );
-        stats.rules++;
+    for (const dir of Object.values(paths)) {
+      fs.mkdirSync(path.join(targetPath, dir), { recursive: true });
+    }
+
+    stats.rules = linkMatchingItems(
+      path.join(__dirname, "config", "rules"),
+      path.join(targetPath, paths.rules),
+      selectedTechs,
+      selectedArchs,
+      linkOrCopy,
+      { filterExtension: ".md", copiedItems: COPIED_RULES },
+    );
+
+    stats.skills = linkMatchingItems(
+      path.join(__dirname, "config", "skills"),
+      path.join(targetPath, paths.skills),
+      selectedTechs,
+      selectedArchs,
+      linkOrCopy,
+      { directoriesOnly: true, copiedItems: COPIED_SKILLS },
+    );
+
+    stats.agents = linkMatchingItems(
+      path.join(__dirname, "config", "agents"),
+      path.join(targetPath, paths.agents),
+      selectedTechs,
+      selectedArchs,
+      linkOrCopy,
+      { directoriesOnly: true, copiedItems: COPIED_AGENTS },
+    );
+
+    for (const [src, dest] of Object.entries(tool.rootFiles)) {
+      const srcPath = path.join(__dirname, "config", src);
+      if (fs.existsSync(srcPath)) {
+        linkOrCopy(srcPath, path.join(targetPath, dest));
       }
     }
-  }
 
-  // Link/copy skills
-  const skillsDir = path.join(__dirname, "config", "skills");
-  if (fs.existsSync(skillsDir) && paths.skills) {
-    for (const dir of fs.readdirSync(skillsDir)) {
-      const skillPath = path.join(skillsDir, dir);
-      if (
-        fs.statSync(skillPath).isDirectory() &&
-        shouldInclude(dir, selectedTechs, selectedArchs, GENERIC_SKILLS)
-      ) {
-        linkOrCopy(skillPath, path.join(targetPath, paths.skills, dir));
-        stats.skills++;
+    for (const [src, dest] of Object.entries(tool.configFiles)) {
+      const srcPath = path.join(__dirname, "config", src);
+      if (fs.existsSync(srcPath)) {
+        fs.mkdirSync(path.dirname(path.join(targetPath, dest)), {
+          recursive: true,
+        });
+        copyPath(srcPath, path.join(targetPath, dest));
       }
     }
-  }
 
-  // Link/copy agents
-  const agentsDir = path.join(__dirname, "config", "agents");
-  if (fs.existsSync(agentsDir) && paths.agents) {
-    for (const dir of fs.readdirSync(agentsDir)) {
-      const agentPath = path.join(agentsDir, dir);
-      if (
-        fs.statSync(agentPath).isDirectory() &&
-        shouldInclude(dir, selectedTechs, selectedArchs, GENERIC_AGENTS)
-      ) {
-        linkOrCopy(agentPath, path.join(targetPath, paths.agents, dir));
-        stats.agents++;
-      }
-    }
-  }
+    updateGitignore(targetPath, tool, gitignoreMode);
 
-  // Link/copy root files (e.g., AGENTS.md → CLAUDE.md)
-  for (const [sourceFile, targetFile] of Object.entries(
-    selectedTool.rootFiles,
-  )) {
-    const sourcePath = path.join(__dirname, "config", sourceFile);
-    if (fs.existsSync(sourcePath)) {
-      linkOrCopy(sourcePath, path.join(targetPath, targetFile));
-    }
-  }
+    const toolSummary = [
+      `Rules:  ${stats.rules} ${mode}`,
+      paths.skills ? `Skills: ${stats.skills} ${mode}` : null,
+      paths.agents ? `Agents: ${stats.agents} ${mode}` : null,
+      ...Object.values(tool.rootFiles).map((f) => `${f}: ${mode}`),
+      ...Object.values(tool.configFiles).map((f) => `${f}: copied`),
+      `.gitignore: ${gitignoreMode === "exceptions" ? "exceptions added" : "entries added"}`,
+    ].filter(Boolean);
 
-  // Always copy config files (never symlink)
-  for (const [sourceFile, targetFile] of Object.entries(
-    selectedTool.configFiles,
-  )) {
-    const sourcePath = path.join(__dirname, "config", sourceFile);
-    if (fs.existsSync(sourcePath)) {
-      // Ensure target directory exists
-      const targetDir = path.dirname(path.join(targetPath, targetFile));
-      fs.mkdirSync(targetDir, { recursive: true });
-      copyPath(sourcePath, path.join(targetPath, targetFile));
-    }
+    summaryLines.push({ tool, lines: toolSummary });
   }
-
-  // Update .gitignore
-  updateGitignore(targetPath, selectedTool, gitignoreMode);
 
   s.stop("Setup complete");
 
-  const mode = useSymlinks ? "linked" : "copied";
-  const summaryLines = [`Rules:  ${stats.rules} ${mode}`];
-
-  if (paths.skills) {
-    summaryLines.push(`Skills: ${stats.skills} ${mode}`);
+  for (const { tool, lines } of summaryLines) {
+    p.note(lines.join("\n"), `${tool.label} Setup`);
   }
-  if (paths.agents) {
-    summaryLines.push(`Agents: ${stats.agents} ${mode}`);
-  }
-
-  for (const targetFile of Object.values(selectedTool.rootFiles)) {
-    summaryLines.push(`${targetFile}: ${mode}`);
-  }
-  for (const targetFile of Object.values(selectedTool.configFiles)) {
-    summaryLines.push(`${targetFile}: copied`);
-  }
-  const gitignoreAction =
-    gitignoreMode === "exceptions" ? "exceptions added" : "entries added";
-  summaryLines.push(`.gitignore: ${gitignoreAction}`);
-
-  p.note(summaryLines.join("\n"), `${selectedTool.label} Setup`);
 
   p.note(
     [
       "1. Modify Project.md to add project-specific rules",
-      "2. Add skills, agents, or MCP based on your needs",
-      "3. Alternatively, add Claude Code plugins",
+      "2. Add rules, skills, agents, MCPs or plugins based on your needs",
     ].join("\n"),
     "Next Steps",
   );
@@ -328,23 +273,58 @@ function resolvePath(inputPath) {
   return path.resolve(inputPath);
 }
 
-function shouldInclude(name, selectedTechs, selectedArchs, genericList) {
-  if (genericList.includes(name)) return true;
+function isTechOrArchSpecific(name) {
+  const allTechs = TECHNOLOGIES.map((t) => t.value);
+  const allArchs = ARCHITECTURES.filter((a) => a.value !== "none").map(
+    (a) => a.value,
+  );
+
+  return (
+    allTechs.some((tech) => name.startsWith(`${tech}-`)) ||
+    allArchs.some((arch) => name.includes(arch))
+  );
+}
+
+function shouldInclude(name, selectedTechs, selectedArchs) {
+  if (!isTechOrArchSpecific(name)) return true;
+
   const matchesTech = selectedTechs.some((tech) => name.startsWith(`${tech}-`));
   const matchesArch = selectedArchs
     .filter((arch) => arch !== "none")
     .some((arch) => name.includes(arch));
+
   return matchesTech || matchesArch;
 }
 
-function shouldIncludeRule(filename, selectedTechs, selectedArchs) {
-  const name = filename.replace(".md", "");
-  return shouldInclude(name, selectedTechs, selectedArchs, GENERIC_RULES);
-}
+function linkMatchingItems(
+  sourceDir,
+  targetDir,
+  selectedTechs,
+  selectedArchs,
+  linkOrCopy,
+  { filterExtension, directoriesOnly, copiedItems = [] } = {},
+) {
+  if (!fs.existsSync(sourceDir)) return 0;
 
-function isGeneric(filename) {
-  const name = filename.replace(".md", "");
-  return GENERIC_RULES.includes(name);
+  let count = 0;
+
+  for (const entry of fs.readdirSync(sourceDir)) {
+    const fullPath = path.join(sourceDir, entry);
+    const isDir = fs.statSync(fullPath).isDirectory();
+
+    if (directoriesOnly && !isDir) continue;
+    if (filterExtension && !entry.endsWith(filterExtension)) continue;
+
+    const name = entry.replace(/\.md$/, "");
+
+    if (!shouldInclude(name, selectedTechs, selectedArchs)) continue;
+
+    const action = copiedItems.includes(name) ? copyPath : linkOrCopy;
+    action(fullPath, path.join(targetDir, entry));
+    count++;
+  }
+
+  return count;
 }
 
 function removePath(target) {
@@ -363,6 +343,7 @@ function createSymlink(source, target) {
 
 function copyPath(source, target) {
   removePath(target);
+
   if (fs.statSync(source).isDirectory()) {
     fs.cpSync(source, target, { recursive: true });
   } else {
@@ -370,13 +351,6 @@ function copyPath(source, target) {
   }
 }
 
-/**
- * Updates or creates the .gitignore file in the target directory
- * to include tool-specific configuration entries.
- * @param {string} targetPath - The target project directory
- * @param {object} tool - The selected tool configuration
- * @param {string} mode - "add" to ignore entries, "exceptions" to use negation patterns
- */
 function updateGitignore(targetPath, tool, mode) {
   const gitignorePath = path.join(targetPath, ".gitignore");
   const sectionHeader = `# ${tool.label} Configuration`;
@@ -385,27 +359,18 @@ function updateGitignore(targetPath, tool, mode) {
   if (fs.existsSync(gitignorePath)) {
     content = fs.readFileSync(gitignorePath, "utf-8");
 
-    // Check if section already exists
-    if (content.includes(sectionHeader)) {
-      return; // Already configured
-    }
+    if (content.includes(sectionHeader)) return;
 
-    // Ensure content ends with newline before adding section
-    if (content.length > 0 && !content.endsWith("\n")) {
-      content += "\n";
-    }
+    if (content.length > 0 && !content.endsWith("\n")) content += "\n";
     content += "\n";
   }
 
-  // Add tool-specific section
   content += sectionHeader + "\n";
 
   if (mode === "exceptions") {
-    // Use negation patterns to track specific files
     content +=
       tool.gitignoreEntries.map((entry) => `!${entry}`).join("\n") + "\n";
   } else {
-    // Default: add entries to ignore
     content += tool.gitignoreEntries.join("\n") + "\n";
   }
 
