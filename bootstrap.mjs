@@ -28,6 +28,9 @@ const COPIED_RULES = ["project"];
 const COPIED_SKILLS = [];
 const COPIED_AGENTS = [];
 
+// Intermediate directory in the target project for per-project customizable resources
+const INTERMEDIATE_DIR = "mvagnon-agents";
+
 // Tool definitions: directory structure, root files, config files, gitignore
 const TOOLS = {
   claudecode: {
@@ -127,29 +130,10 @@ async function main() {
 
       useSymlinks: () =>
         p.confirm({
-          message: "Use symlinks?",
+          message:
+            "Use symlinks? (yes: `.gitignore` updated, no: config versioned)",
           initialValue: true,
         }),
-
-      gitignoreMode: ({ results }) => {
-        if (results.useSymlinks) return Promise.resolve("add");
-
-        return p.select({
-          message: "Gitignore handling?",
-          options: [
-            {
-              value: "add",
-              label: "Add to .gitignore",
-              hint: "Add entries to ignore config files",
-            },
-            {
-              value: "exceptions",
-              label: "Create exceptions",
-              hint: "Use negation patterns (!path) to track specific files",
-            },
-          ],
-        });
-      },
 
       tools: () =>
         p.multiselect({
@@ -173,7 +157,6 @@ async function main() {
   const selectedTechs = config.techs || [];
   const selectedArchs = config.archs ? [config.archs] : [];
   const useSymlinks = config.useSymlinks;
-  const gitignoreMode = config.gitignoreMode;
   const selectedTools = config.tools.map((key) => TOOLS[key]);
   const linkOrCopy = useSymlinks ? createSymlink : copyPath;
 
@@ -197,7 +180,11 @@ async function main() {
       selectedTechs,
       selectedArchs,
       linkOrCopy,
-      { filterExtension: ".md", copiedItems: COPIED_RULES },
+      {
+        filterExtension: ".md",
+        copiedItems: COPIED_RULES,
+        intermediateDir: path.join(targetPath, INTERMEDIATE_DIR, "rules"),
+      },
     );
 
     stats.skills = linkMatchingItems(
@@ -206,7 +193,11 @@ async function main() {
       selectedTechs,
       selectedArchs,
       linkOrCopy,
-      { directoriesOnly: true, copiedItems: COPIED_SKILLS },
+      {
+        directoriesOnly: true,
+        copiedItems: COPIED_SKILLS,
+        intermediateDir: path.join(targetPath, INTERMEDIATE_DIR, "skills"),
+      },
     );
 
     stats.agents = linkMatchingItems(
@@ -215,7 +206,11 @@ async function main() {
       selectedTechs,
       selectedArchs,
       linkOrCopy,
-      { directoriesOnly: true, copiedItems: COPIED_AGENTS },
+      {
+        directoriesOnly: true,
+        copiedItems: COPIED_AGENTS,
+        intermediateDir: path.join(targetPath, INTERMEDIATE_DIR, "agents"),
+      },
     );
 
     for (const [src, dest] of Object.entries(tool.rootFiles)) {
@@ -235,7 +230,10 @@ async function main() {
       }
     }
 
-    updateGitignore(targetPath, tool, gitignoreMode);
+    if (useSymlinks) {
+      updateGitignore(targetPath, tool);
+      addGitignoreEntry(targetPath, INTERMEDIATE_DIR);
+    }
 
     const toolSummary = [
       `Rules:  ${stats.rules} ${mode}`,
@@ -243,7 +241,7 @@ async function main() {
       paths.agents ? `Agents: ${stats.agents} ${mode}` : null,
       ...Object.values(tool.rootFiles).map((f) => `${f}: ${mode}`),
       ...Object.values(tool.configFiles).map((f) => `${f}: copied`),
-      `.gitignore: ${gitignoreMode === "exceptions" ? "exceptions added" : "entries added"}`,
+      useSymlinks ? `.gitignore: entries added` : `.gitignore: not modified`,
     ].filter(Boolean);
 
     summaryLines.push({ tool, lines: toolSummary });
@@ -257,8 +255,8 @@ async function main() {
 
   p.note(
     [
-      "1. Modify Project.md to add project-specific rules",
-      "2. Add rules, skills, agents, MCPs or plugins based on your needs",
+      "1. Modify `project.md` to add project-specific rules;",
+      "2. Add rules, skills, agents, MCPs or plugins based on your needs for each tool.",
     ].join("\n"),
     "Next Steps",
   );
@@ -302,7 +300,7 @@ function linkMatchingItems(
   selectedTechs,
   selectedArchs,
   linkOrCopy,
-  { filterExtension, directoriesOnly, copiedItems = [] } = {},
+  { filterExtension, directoriesOnly, copiedItems = [], intermediateDir } = {},
 ) {
   if (!fs.existsSync(sourceDir)) return 0;
 
@@ -319,8 +317,17 @@ function linkMatchingItems(
 
     if (!shouldInclude(name, selectedTechs, selectedArchs)) continue;
 
-    const action = copiedItems.includes(name) ? copyPath : linkOrCopy;
-    action(fullPath, path.join(targetDir, entry));
+    if (copiedItems.includes(name) && intermediateDir) {
+      // Copy to intermediate dir first, then link/copy from there to tool dir
+      fs.mkdirSync(intermediateDir, { recursive: true });
+      copyPath(fullPath, path.join(intermediateDir, entry));
+      linkOrCopy(
+        path.join(intermediateDir, entry),
+        path.join(targetDir, entry),
+      );
+    } else {
+      linkOrCopy(fullPath, path.join(targetDir, entry));
+    }
     count++;
   }
 
@@ -351,7 +358,7 @@ function copyPath(source, target) {
   }
 }
 
-function updateGitignore(targetPath, tool, mode) {
+function updateGitignore(targetPath, tool) {
   const gitignorePath = path.join(targetPath, ".gitignore");
   const sectionHeader = `# ${tool.label} Configuration`;
   let content = "";
@@ -366,14 +373,22 @@ function updateGitignore(targetPath, tool, mode) {
   }
 
   content += sectionHeader + "\n";
+  content += tool.gitignoreEntries.join("\n") + "\n";
 
-  if (mode === "exceptions") {
-    content +=
-      tool.gitignoreEntries.map((entry) => `!${entry}`).join("\n") + "\n";
-  } else {
-    content += tool.gitignoreEntries.join("\n") + "\n";
+  fs.writeFileSync(gitignorePath, content);
+}
+
+function addGitignoreEntry(targetPath, entry) {
+  const gitignorePath = path.join(targetPath, ".gitignore");
+  let content = "";
+
+  if (fs.existsSync(gitignorePath)) {
+    content = fs.readFileSync(gitignorePath, "utf-8");
+    if (content.split("\n").some((line) => line.trim() === entry)) return;
+    if (content.length > 0 && !content.endsWith("\n")) content += "\n";
   }
 
+  content += entry + "\n";
   fs.writeFileSync(gitignorePath, content);
 }
 

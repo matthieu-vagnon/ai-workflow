@@ -100,8 +100,6 @@ bootstrap.mjs                             # Node.js setup script
 
 ## Supported Tools
 
-![Features Illustration](./.github/assets/readme-illustration.png)
-
 | Tool        | Rules              | Skills/Agents                            | Root File   | Config File          |
 | ----------- | ------------------ | ---------------------------------------- | ----------- | -------------------- |
 | Claude Code | `.claude/rules/`   | `.claude/skills/`, `.claude/agents/`     | `CLAUDE.md` | `.mcp.json`          |
