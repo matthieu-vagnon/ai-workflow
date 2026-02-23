@@ -69,9 +69,9 @@ Before writing or modifying code that uses any external library:
 
 ## After Writing Code
 
-ALWAYS check the following after modifying the codebase. Iterate until complete:
+CRITICAL: ALWAYS check the following after modifying the codebase. Iterate until complete:
 
-- [ ] Generic code is reusable
-- [ ] No code was duplicated
+- [ ] KISS (Keep It Stupid Simple) principle is applied
+- [ ] DRY (Don't Repeat Yourself) principle is applied
 - [ ] No logs were added without prior consent
 - [ ] Code is properly spaced into logical blocks
