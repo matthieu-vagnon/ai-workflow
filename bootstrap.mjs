@@ -29,7 +29,7 @@ const COPIED_SKILLS = [];
 const COPIED_AGENTS = [];
 
 // Intermediate directory in the target project for per-project customizable resources
-const INTERMEDIATE_DIR = "mvagnon-agents";
+const INTERMEDIATE_DIR = ".mvagnon-agents";
 
 // Tool definitions: directory structure, root files, config files, gitignore
 const TOOLS = {
@@ -67,6 +67,8 @@ const TOOLS = {
     hint: "AI-powered code editor",
     paths: {
       rules: ".cursor/rules",
+      skills: ".cursor/skills",
+      agents: ".cursor/agents",
     },
     rootFiles: {},
     configFiles: { "cursor.mcp.json": ".cursor/mcp.json" },
@@ -77,10 +79,12 @@ const TOOLS = {
     value: "codex",
     label: "Codex",
     hint: "OpenAI's coding agent CLI",
-    paths: {},
+    paths: {
+      skills: ".agents/skills",
+    },
     rootFiles: { "AGENTS.md": "AGENTS.md" },
     configFiles: { "codex.config.toml": ".codex/config.toml" },
-    gitignoreEntries: [".codex", "AGENTS.md"],
+    gitignoreEntries: [".codex", ".agents", "AGENTS.md"],
   },
 };
 
@@ -165,6 +169,7 @@ async function main() {
 
   const mode = useSymlinks ? "linked" : "copied";
   const summaryLines = [];
+  const processedIntermediateFiles = new Set();
 
   for (const tool of selectedTools) {
     const stats = { rules: 0, skills: 0, agents: 0 };
@@ -174,44 +179,56 @@ async function main() {
       fs.mkdirSync(path.join(targetPath, dir), { recursive: true });
     }
 
-    stats.rules = linkMatchingItems(
-      path.join(__dirname, "config", "rules"),
-      path.join(targetPath, paths.rules),
-      selectedTechs,
-      selectedArchs,
-      linkOrCopy,
-      {
-        filterExtension: ".md",
-        copiedItems: COPIED_RULES,
-        intermediateDir: path.join(targetPath, INTERMEDIATE_DIR, "rules"),
-      },
-    );
+    if (paths.rules) {
+      stats.rules = await linkMatchingItems(
+        path.join(__dirname, "config", "rules"),
+        path.join(targetPath, paths.rules),
+        selectedTechs,
+        selectedArchs,
+        linkOrCopy,
+        {
+          filterExtension: ".md",
+          copiedItems: COPIED_RULES,
+          intermediateDir: path.join(targetPath, INTERMEDIATE_DIR, "rules"),
+          spinner: s,
+          processedIntermediateFiles,
+        },
+      );
+    }
 
-    stats.skills = linkMatchingItems(
-      path.join(__dirname, "config", "skills"),
-      path.join(targetPath, paths.skills),
-      selectedTechs,
-      selectedArchs,
-      linkOrCopy,
-      {
-        directoriesOnly: true,
-        copiedItems: COPIED_SKILLS,
-        intermediateDir: path.join(targetPath, INTERMEDIATE_DIR, "skills"),
-      },
-    );
+    if (paths.skills) {
+      stats.skills = await linkMatchingItems(
+        path.join(__dirname, "config", "skills"),
+        path.join(targetPath, paths.skills),
+        selectedTechs,
+        selectedArchs,
+        linkOrCopy,
+        {
+          directoriesOnly: true,
+          copiedItems: COPIED_SKILLS,
+          intermediateDir: path.join(targetPath, INTERMEDIATE_DIR, "skills"),
+          spinner: s,
+          processedIntermediateFiles,
+        },
+      );
+    }
 
-    stats.agents = linkMatchingItems(
-      path.join(__dirname, "config", "agents"),
-      path.join(targetPath, paths.agents),
-      selectedTechs,
-      selectedArchs,
-      linkOrCopy,
-      {
-        directoriesOnly: true,
-        copiedItems: COPIED_AGENTS,
-        intermediateDir: path.join(targetPath, INTERMEDIATE_DIR, "agents"),
-      },
-    );
+    if (paths.agents) {
+      stats.agents = await linkMatchingItems(
+        path.join(__dirname, "config", "agents"),
+        path.join(targetPath, paths.agents),
+        selectedTechs,
+        selectedArchs,
+        linkOrCopy,
+        {
+          directoriesOnly: true,
+          copiedItems: COPIED_AGENTS,
+          intermediateDir: path.join(targetPath, INTERMEDIATE_DIR, "agents"),
+          spinner: s,
+          processedIntermediateFiles,
+        },
+      );
+    }
 
     for (const [src, dest] of Object.entries(tool.rootFiles)) {
       const srcPath = path.join(__dirname, "config", src);
@@ -232,7 +249,7 @@ async function main() {
 
     if (useSymlinks) {
       updateGitignore(targetPath, tool);
-      addGitignoreEntry(targetPath, INTERMEDIATE_DIR);
+      addGitignoreEntry(targetPath, INTERMEDIATE_DIR, "mvagnon AI Workflow");
     }
 
     const toolSummary = [
@@ -294,17 +311,25 @@ function shouldInclude(name, selectedTechs, selectedArchs) {
   return matchesTech || matchesArch;
 }
 
-function linkMatchingItems(
+async function linkMatchingItems(
   sourceDir,
   targetDir,
   selectedTechs,
   selectedArchs,
   linkOrCopy,
-  { filterExtension, directoriesOnly, copiedItems = [], intermediateDir } = {},
+  {
+    filterExtension,
+    directoriesOnly,
+    copiedItems = [],
+    intermediateDir,
+    spinner,
+    processedIntermediateFiles = new Set(),
+  } = {},
 ) {
   if (!fs.existsSync(sourceDir)) return 0;
 
-  let count = 0;
+  // First pass: collect all items and detect conflicts
+  const items = [];
 
   for (const entry of fs.readdirSync(sourceDir)) {
     const fullPath = path.join(sourceDir, entry);
@@ -317,21 +342,63 @@ function linkMatchingItems(
 
     if (!shouldInclude(name, selectedTechs, selectedArchs)) continue;
 
-    if (copiedItems.includes(name) && intermediateDir) {
-      // Copy to intermediate dir first, then link/copy from there to tool dir
-      fs.mkdirSync(intermediateDir, { recursive: true });
-      copyPath(fullPath, path.join(intermediateDir, entry));
-      linkOrCopy(
-        path.join(intermediateDir, entry),
-        path.join(targetDir, entry),
-      );
-    } else {
-      linkOrCopy(fullPath, path.join(targetDir, entry));
-    }
-    count++;
+    const isCopied = copiedItems.includes(name) && intermediateDir;
+    const intermediatePath = isCopied
+      ? path.join(intermediateDir, entry)
+      : null;
+    const alreadyProcessed = isCopied && processedIntermediateFiles.has(intermediatePath);
+    const hasConflict = isCopied && !alreadyProcessed && fs.existsSync(intermediatePath);
+
+    items.push({ entry, fullPath, isCopied, intermediatePath, hasConflict, alreadyProcessed });
   }
 
-  return count;
+  // Ask about all conflicts in one batch (single spinner stop/start)
+  const conflicts = items.filter((item) => item.hasConflict);
+  const overwriteSet = new Set();
+
+  if (conflicts.length > 0) {
+    if (spinner) spinner.stop("Existing files found");
+
+    for (const item of conflicts) {
+      const relPath = `${INTERMEDIATE_DIR}/${path.basename(intermediateDir)}/${item.entry}`;
+      const overwrite = await p.confirm({
+        message: `${relPath} already exists. Overwrite?`,
+        initialValue: false,
+      });
+      if (p.isCancel(overwrite)) {
+        p.cancel("Setup cancelled");
+        process.exit(0);
+      }
+      if (overwrite) overwriteSet.add(item.entry);
+    }
+
+    if (spinner) spinner.start("Continuing setup");
+  }
+
+  // Second pass: apply copies and links
+  for (const item of items) {
+    if (item.isCopied) {
+      fs.mkdirSync(intermediateDir, { recursive: true });
+
+      if (item.alreadyProcessed) {
+        // Already copied/resolved by a previous tool, just link
+      } else if (item.hasConflict) {
+        if (overwriteSet.has(item.entry)) {
+          copyPath(item.fullPath, item.intermediatePath);
+        }
+        processedIntermediateFiles.add(item.intermediatePath);
+      } else {
+        copyPath(item.fullPath, item.intermediatePath);
+        processedIntermediateFiles.add(item.intermediatePath);
+      }
+
+      linkOrCopy(item.intermediatePath, path.join(targetDir, item.entry));
+    } else {
+      linkOrCopy(item.fullPath, path.join(targetDir, item.entry));
+    }
+  }
+
+  return items.length;
 }
 
 function removePath(target) {
@@ -378,7 +445,7 @@ function updateGitignore(targetPath, tool) {
   fs.writeFileSync(gitignorePath, content);
 }
 
-function addGitignoreEntry(targetPath, entry) {
+function addGitignoreEntry(targetPath, entry, sectionComment) {
   const gitignorePath = path.join(targetPath, ".gitignore");
   let content = "";
 
@@ -386,8 +453,12 @@ function addGitignoreEntry(targetPath, entry) {
     content = fs.readFileSync(gitignorePath, "utf-8");
     if (content.split("\n").some((line) => line.trim() === entry)) return;
     if (content.length > 0 && !content.endsWith("\n")) content += "\n";
+    content += "\n";
   }
 
+  if (sectionComment) {
+    content += `# ${sectionComment}\n`;
+  }
   content += entry + "\n";
   fs.writeFileSync(gitignorePath, content);
 }
