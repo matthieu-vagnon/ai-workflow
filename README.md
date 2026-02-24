@@ -1,6 +1,23 @@
+```
+                                    __                 _
+ _ ____ ____ _ __ _ _ _  ___ _ _   / /_ _ __ _ ___ _ _| |_ ___
+| '  \ V / _` / _` | ' \/ _ \ ' \ / / _` / _` / -_) ' \  _(_-<
+|_|_|_\_/\__,_\__, |_||_\___/_||_/_/\__,_\__, \___|_||_\__/__/
+              |___/                      |___/
+```
+
 # AI Workflow
 
-Configuration and conventions to optimize AI coding assistants on TypeScript/React projects.
+Shared configuration and conventions to bootstrap AI coding assistants on TypeScript/React projects. One repo, one command — every tool gets the same rules, skills, and MCP servers.
+
+## Supported Tools
+
+| Tool        | Rules              | Skills / Agents                          | Root File   | MCP Config           |
+| ----------- | ------------------ | ---------------------------------------- | ----------- | -------------------- |
+| Claude Code | `.claude/rules/`   | `.claude/skills/`, `.claude/agents/`     | `CLAUDE.md` | `.mcp.json`          |
+| OpenCode    | `.opencode/rules/` | `.opencode/skills/`, `.opencode/agents/` | `AGENTS.md` | `opencode.json`      |
+| Cursor      | `.cursor/rules/`   | `.cursor/skills/`, `.cursor/agents/`     | —           | `.cursor/mcp.json`   |
+| Codex       | —                  | `.agents/skills/`                        | `AGENTS.md` | `.codex/config.toml` |
 
 ## Tech Stack Coverage
 
@@ -39,11 +56,10 @@ node bootstrap.mjs ~/projects/my-app
 
 The script prompts you to:
 
-1. **Select technologies**: Choose React and/or TypeScript to filter relevant rules
-2. **Select architecture**: Optional (e.g., Hexagonal)
-3. **Choose mode**: Symlinks (recommended) or copy files
-4. **Gitignore handling**: Add entries to ignore or create exceptions
-5. **Select target tools**: One or more tools (Claude Code, OpenCode, Cursor, Codex)
+1. **Select technologies** — filter rules by stack (React, TypeScript)
+2. **Select architecture** — optional (e.g. Hexagonal)
+3. **Choose mode** — symlinks (recommended) or copy files
+4. **Select target tools** — one or more (Claude Code, OpenCode, Cursor, Codex)
 
 ```
 AI Workflow → /Users/you/projects/my-app
@@ -84,10 +100,10 @@ Done
 ```
 config/
 ├── rules/
-│   ├── project.md                        # Generic project rules (always copied)
+│   ├── project.md                        # Generic project rules (always included)
 │   └── react-hexagonal-architecture.md   # Hexagonal architecture for React
 ├── skills/
-│   └── readme-writing/                   # README generation
+│   └── readme-writing/                   # README generation skill
 ├── agents/                               # Custom agents (optional)
 ├── AGENTS.md                             # Master rules for all agents
 ├── claudecode.settings.json              # Claude Code MCP config
@@ -95,17 +111,8 @@ config/
 ├── cursor.mcp.json                       # Cursor MCP config
 └── codex.config.toml                     # Codex MCP config (TOML)
 
-bootstrap.mjs                             # Node.js setup script
+bootstrap.mjs                             # Interactive setup script
 ```
-
-## Supported Tools
-
-| Tool        | Rules              | Skills/Agents                            | Root File   | Config File          |
-| ----------- | ------------------ | ---------------------------------------- | ----------- | -------------------- |
-| Claude Code | `.claude/rules/`   | `.claude/skills/`, `.claude/agents/`     | `CLAUDE.md` | `.mcp.json`          |
-| OpenCode    | `.opencode/rules/` | `.opencode/skills/`, `.opencode/agents/` | `AGENTS.md` | `opencode.json`      |
-| Cursor      | `.cursor/rules/`   | —                                        | —           | `.cursor/mcp.json`   |
-| Codex       | —                  | —                                        | `AGENTS.md` | `.codex/config.toml` |
 
 ## Rule Filtering
 
