@@ -172,9 +172,13 @@ async function main() {
   const selectedArchs = config.archs ? [config.archs] : [];
   const useSymlinks = config.useSymlinks;
   const selectedTools = config.tools.map((key) => TOOLS[key]);
-  const linkOrCopy = useSymlinks ? createSymlink : copyPath;
-
   const s = p.spinner();
+  const safeCopy = (src, tgt) =>
+    copyWithConfirm(src, tgt, { spinner: s, projectRoot: targetPath });
+  const linkOrCopy = useSymlinks
+    ? async (src, tgt) => createSymlink(src, tgt)
+    : safeCopy;
+
   s.start(useSymlinks ? "Creating symlinks" : "Copying files");
 
   const mode = useSymlinks ? "linked" : "copied";
@@ -200,8 +204,8 @@ async function main() {
           filterExtension: ".md",
           copiedItems: COPIED_RULES,
           intermediateDir: path.join(targetPath, INTERMEDIATE_DIR, "rules"),
-          spinner: s,
           processedIntermediateFiles,
+          safeCopy,
         },
       );
     }
@@ -217,8 +221,8 @@ async function main() {
           directoriesOnly: true,
           copiedItems: COPIED_SKILLS,
           intermediateDir: path.join(targetPath, INTERMEDIATE_DIR, "skills"),
-          spinner: s,
           processedIntermediateFiles,
+          safeCopy,
         },
       );
     }
@@ -234,8 +238,8 @@ async function main() {
           directoriesOnly: true,
           copiedItems: COPIED_AGENTS,
           intermediateDir: path.join(targetPath, INTERMEDIATE_DIR, "agents"),
-          spinner: s,
           processedIntermediateFiles,
+          safeCopy,
         },
       );
     }
@@ -243,23 +247,22 @@ async function main() {
     for (const [src, dest] of Object.entries(tool.rootFiles)) {
       const srcPath = path.join(__dirname, "config", src);
       if (fs.existsSync(srcPath)) {
-        linkOrCopy(srcPath, path.join(targetPath, dest));
+        await linkOrCopy(srcPath, path.join(targetPath, dest));
       }
     }
 
     for (const [src, dest] of Object.entries(tool.configFiles)) {
       const srcPath = path.join(__dirname, "config", src);
       if (fs.existsSync(srcPath)) {
-        fs.mkdirSync(path.dirname(path.join(targetPath, dest)), {
-          recursive: true,
-        });
-        copyPath(srcPath, path.join(targetPath, dest));
+        const destPath = path.join(targetPath, dest);
+        fs.mkdirSync(path.dirname(destPath), { recursive: true });
+        await safeCopy(srcPath, destPath);
       }
     }
 
     if (useSymlinks) {
       updateGitignore(targetPath, tool);
-      addGitignoreEntry(targetPath, INTERMEDIATE_DIR, "mvagnon AI Workflow");
+      addGitignoreEntry(targetPath, INTERMEDIATE_DIR, "mvagnon/agents");
     }
 
     const toolSummary = [
@@ -332,14 +335,13 @@ async function linkMatchingItems(
     directoriesOnly,
     copiedItems = [],
     intermediateDir,
-    spinner,
+    safeCopy,
     processedIntermediateFiles = new Set(),
   } = {},
 ) {
   if (!fs.existsSync(sourceDir)) return 0;
 
-  // First pass: collect all items and detect conflicts
-  const items = [];
+  let count = 0;
 
   for (const entry of fs.readdirSync(sourceDir)) {
     const fullPath = path.join(sourceDir, entry);
@@ -353,71 +355,53 @@ async function linkMatchingItems(
     if (!shouldInclude(name, selectedTechs, selectedArchs)) continue;
 
     const isCopied = copiedItems.includes(name) && intermediateDir;
-    const intermediatePath = isCopied
-      ? path.join(intermediateDir, entry)
-      : null;
-    const alreadyProcessed =
-      isCopied && processedIntermediateFiles.has(intermediatePath);
-    const hasConflict =
-      isCopied && !alreadyProcessed && fs.existsSync(intermediatePath);
 
-    items.push({
-      entry,
-      fullPath,
-      isCopied,
-      intermediatePath,
-      hasConflict,
-      alreadyProcessed,
-    });
-  }
-
-  // Ask about all conflicts in one batch (single spinner stop/start)
-  const conflicts = items.filter((item) => item.hasConflict);
-  const overwriteSet = new Set();
-
-  if (conflicts.length > 0) {
-    if (spinner) spinner.stop("Existing files found");
-
-    for (const item of conflicts) {
-      const relPath = `${INTERMEDIATE_DIR}/${path.basename(intermediateDir)}/${item.entry}`;
-      const overwrite = await p.confirm({
-        message: `${relPath} already exists. Overwrite?`,
-        initialValue: false,
-      });
-      if (p.isCancel(overwrite)) {
-        p.cancel("Setup cancelled");
-        process.exit(0);
-      }
-      if (overwrite) overwriteSet.add(item.entry);
-    }
-
-    if (spinner) spinner.start("Continuing setup");
-  }
-
-  // Second pass: apply copies and links
-  for (const item of items) {
-    if (item.isCopied) {
+    if (isCopied) {
+      const intermediatePath = path.join(intermediateDir, entry);
       fs.mkdirSync(intermediateDir, { recursive: true });
 
-      if (item.alreadyProcessed) {
-        // Already copied/resolved by a previous tool, just link
-      } else if (item.hasConflict) {
-        if (overwriteSet.has(item.entry)) {
-          copyPath(item.fullPath, item.intermediatePath);
-        }
-        processedIntermediateFiles.add(item.intermediatePath);
-      } else {
-        copyPath(item.fullPath, item.intermediatePath);
-        processedIntermediateFiles.add(item.intermediatePath);
+      if (!processedIntermediateFiles.has(intermediatePath)) {
+        await safeCopy(fullPath, intermediatePath);
+        processedIntermediateFiles.add(intermediatePath);
       }
 
-      linkOrCopy(item.intermediatePath, path.join(targetDir, item.entry));
+      await linkOrCopy(intermediatePath, path.join(targetDir, entry));
     } else {
-      linkOrCopy(item.fullPath, path.join(targetDir, item.entry));
+      await linkOrCopy(fullPath, path.join(targetDir, entry));
+    }
+
+    count++;
+  }
+
+  return count;
+}
+
+async function copyWithConfirm(source, target, { spinner, projectRoot } = {}) {
+  if (fs.existsSync(target)) {
+    try {
+      if (!fs.lstatSync(target).isSymbolicLink()) {
+        const label = projectRoot
+          ? path.relative(projectRoot, target)
+          : path.basename(target);
+        if (spinner) spinner.stop("Existing file found");
+        const overwrite = await p.confirm({
+          message: `${label} already exists. Overwrite?`,
+          initialValue: false,
+        });
+        if (p.isCancel(overwrite)) {
+          p.cancel("Setup cancelled");
+          process.exit(0);
+        }
+        if (spinner) spinner.start("Continuing setup");
+        if (!overwrite) return false;
+      }
+    } catch {
+      // lstat failed, proceed with copy
     }
   }
 
-  return items.length;
+  copyPath(source, target);
+  return true;
 }
 
 function removePath(target) {
