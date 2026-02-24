@@ -38,7 +38,7 @@ Shared configuration and conventions to bootstrap AI coding assistants on TypeSc
 ### Usage
 
 ```bash
-npx mvagnon-agents ../my-project
+npx -y mvagnon-agents ../my-project
 ```
 
 ### Interactive Walkthrough
