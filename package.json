@@ -1,10 +1,30 @@
 {
-  "name": "opencode-workflow",
+  "name": "mvagnon-agents",
   "version": "1.0.0",
+  "description": "Shared configuration and conventions to bootstrap AI coding assistants.",
   "type": "module",
+  "bin": {
+    "opencode-workflow": "./bootstrap.mjs"
+  },
+  "files": [
+    "bootstrap.mjs",
+    "config/"
+  ],
   "scripts": {
     "bootstrap": "node bootstrap.mjs"
   },
+  "keywords": [
+    "ai",
+    "coding-assistant",
+    "claude-code",
+    "cursor",
+    "opencode",
+    "codex",
+    "bootstrap",
+    "typescript",
+    "react"
+  ],
+  "license": "MIT",
   "dependencies": {
     "@clack/prompts": "^0.11.0"
   }

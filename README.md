@@ -34,22 +34,11 @@ Shared configuration and conventions to bootstrap AI coding assistants on TypeSc
 ### Prerequisites
 
 - Node.js >= 18
-- pnpm or npm
-
-### Installation
-
-```bash
-pnpm install
-```
 
 ### Usage
 
 ```bash
-# Run the bootstrap script with target path
-pnpm run bootstrap ../my-project
-
-# Or directly with node
-node bootstrap.mjs ~/projects/my-app
+npx mvagnon-agents ../my-project
 ```
 
 ### Interactive Walkthrough
