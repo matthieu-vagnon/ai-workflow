@@ -4,6 +4,7 @@ import * as p from "@clack/prompts";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { syncConfigToStableDir, STABLE_CONFIG_DIR } from "./lib/sync.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -11,13 +12,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // CONFIGURATION
 // =============================================================================
 
-// Technologies filter items by prefix (e.g., "react-*" matches "react-components")
+// Technologies and architectures only filter which mvagnon/agents resources
+// (rules, skills, agents) are included. They do not affect your project setup.
 const TECHNOLOGIES = [
   { value: "react", label: "React", hint: "Components, hooks, patterns" },
   { value: "ts", label: "TypeScript", hint: "Conventions, testing" },
 ];
 
-// Architectures filter items by substring match
 const ARCHITECTURES = [
   { value: "none", label: "None", hint: "No custom architecture" },
   { value: "hexagonal", label: "Hexagonal", hint: "Ports & adapters pattern" },
@@ -95,6 +96,52 @@ const TOOLS = {
 async function main() {
   const targetArg = process.argv[2];
 
+  // --- Upgrade subcommand ---
+  if (targetArg === "upgrade") {
+    const report = syncConfigToStableDir(__dirname);
+    const globalChanged = report.added.length || report.updated.length || report.removed.length;
+
+    console.log(`\n~/.config synced (v${report.version}):`);
+    if (report.added.length)
+      console.log(`  Added:   ${report.added.join(", ")}`);
+    if (report.updated.length)
+      console.log(`  Updated: ${report.updated.join(", ")}`);
+    if (report.removed.length)
+      console.log(`  Removed: ${report.removed.join(", ")}`);
+
+    // If .mvagnon/agents/ exists in cwd, also update local copies
+    const localDir = path.join(process.cwd(), INTERMEDIATE_DIR);
+    const hasLocalDir = fs.existsSync(localDir);
+    let localChanged = false;
+
+    if (hasLocalDir) {
+      const localReport = upgradeLocalIntermediateDir(localDir);
+      localChanged = localReport.updated.length || localReport.removed.length;
+
+      console.log(`\n${INTERMEDIATE_DIR}/ synced:`);
+      if (localReport.updated.length)
+        console.log(`  Updated: ${localReport.updated.join(", ")}`);
+      if (localReport.removed.length)
+        console.log(`  Removed: ${localReport.removed.join(", ")}`);
+    }
+
+    // Summary message
+    console.log("");
+    if (!globalChanged && !localChanged) {
+      console.log("Already up to date.");
+    } else if (globalChanged && hasLocalDir && localChanged) {
+      console.log("Agent instructions updated in all symlinked projects and in this project.");
+    } else if (globalChanged && hasLocalDir && !localChanged) {
+      console.log("Agent instructions updated in all symlinked projects. This project was already up to date.");
+    } else if (globalChanged) {
+      console.log("Agent instructions updated in all symlinked projects.");
+    } else if (localChanged) {
+      console.log("Agent instructions updated in this project.");
+    }
+
+    process.exit(0);
+  }
+
   if (!targetArg) {
     console.error("Usage: ./bootstrap.sh <target-path>");
     console.error("Example: ./bootstrap.sh ../my-project");
@@ -113,6 +160,12 @@ async function main() {
     process.exit(1);
   }
 
+  // Sync config to stable directory before prompts
+  const syncReport = syncConfigToStableDir(__dirname);
+  console.log(
+    `Config synced to ${STABLE_CONFIG_DIR}/ (v${syncReport.version})`,
+  );
+
   console.clear();
 
   const banner = [
@@ -130,23 +183,33 @@ async function main() {
     {
       techs: () =>
         p.multiselect({
-          message: "Select technologies",
+          message: "Select which in-house technology instructions to add",
           options: TECHNOLOGIES,
           required: false,
         }),
 
       archs: () =>
         p.select({
-          message: "Select custom architecture",
+          message: "Select which in-house architecture instructions to add",
           options: ARCHITECTURES,
           required: false,
         }),
 
       useSymlinks: () =>
-        p.confirm({
-          message:
-            "Use symlinks? (yes: `.gitignore` updated, no: config versioned)",
-          initialValue: true,
+        p.select({
+          message: "How should agent files be linked to your project?",
+          options: [
+            {
+              value: true,
+              label: "Symlinks to ~/.config",
+              hint: "Auto-updates across all projects · not tracked in git",
+            },
+            {
+              value: false,
+              label: "Copied locally + relative links",
+              hint: "Tracked in git, shareable with team · updated per project",
+            },
+          ],
         }),
 
       tools: () =>
@@ -177,11 +240,11 @@ async function main() {
     copyWithConfirm(src, tgt, { spinner: s, projectRoot: targetPath });
   const linkOrCopy = useSymlinks
     ? async (src, tgt) => createSymlink(src, tgt)
-    : safeCopy;
+    : async (src, tgt) => createRelativeSymlink(src, tgt);
 
-  s.start(useSymlinks ? "Creating symlinks" : "Copying files");
+  s.start(useSymlinks ? "Creating symlinks" : "Copying files + creating relative links");
 
-  const mode = useSymlinks ? "linked" : "copied";
+  const mode = useSymlinks ? "linked" : "copied + linked";
   const summaryLines = [];
   const processedIntermediateFiles = new Set();
 
@@ -195,7 +258,7 @@ async function main() {
 
     if (paths.rules) {
       stats.rules = await linkMatchingItems(
-        path.join(__dirname, "config", "rules"),
+        path.join(STABLE_CONFIG_DIR, "rules"),
         path.join(targetPath, paths.rules),
         selectedTechs,
         selectedArchs,
@@ -203,6 +266,7 @@ async function main() {
         {
           filterExtension: ".md",
           copiedItems: COPIED_RULES,
+          copyAll: !useSymlinks,
           intermediateDir: path.join(targetPath, INTERMEDIATE_DIR, "rules"),
           processedIntermediateFiles,
           safeCopy,
@@ -212,7 +276,7 @@ async function main() {
 
     if (paths.skills) {
       stats.skills = await linkMatchingItems(
-        path.join(__dirname, "config", "skills"),
+        path.join(STABLE_CONFIG_DIR, "skills"),
         path.join(targetPath, paths.skills),
         selectedTechs,
         selectedArchs,
@@ -220,6 +284,7 @@ async function main() {
         {
           directoriesOnly: true,
           copiedItems: COPIED_SKILLS,
+          copyAll: !useSymlinks,
           intermediateDir: path.join(targetPath, INTERMEDIATE_DIR, "skills"),
           processedIntermediateFiles,
           safeCopy,
@@ -229,7 +294,7 @@ async function main() {
 
     if (paths.agents) {
       stats.agents = await linkMatchingItems(
-        path.join(__dirname, "config", "agents"),
+        path.join(STABLE_CONFIG_DIR, "agents"),
         path.join(targetPath, paths.agents),
         selectedTechs,
         selectedArchs,
@@ -237,6 +302,7 @@ async function main() {
         {
           directoriesOnly: true,
           copiedItems: COPIED_AGENTS,
+          copyAll: !useSymlinks,
           intermediateDir: path.join(targetPath, INTERMEDIATE_DIR, "agents"),
           processedIntermediateFiles,
           safeCopy,
@@ -245,14 +311,25 @@ async function main() {
     }
 
     for (const [src, dest] of Object.entries(tool.rootFiles)) {
-      const srcPath = path.join(__dirname, "config", src);
+      const srcPath = path.join(STABLE_CONFIG_DIR, src);
       if (fs.existsSync(srcPath)) {
-        await linkOrCopy(srcPath, path.join(targetPath, dest));
+        if (!useSymlinks) {
+          const intermediateRoot = path.join(targetPath, INTERMEDIATE_DIR);
+          fs.mkdirSync(intermediateRoot, { recursive: true });
+          const intermediatePath = path.join(intermediateRoot, src);
+          if (!processedIntermediateFiles.has(intermediatePath)) {
+            await safeCopy(srcPath, intermediatePath);
+            processedIntermediateFiles.add(intermediatePath);
+          }
+          await linkOrCopy(intermediatePath, path.join(targetPath, dest));
+        } else {
+          await linkOrCopy(srcPath, path.join(targetPath, dest));
+        }
       }
     }
 
     for (const [src, dest] of Object.entries(tool.configFiles)) {
-      const srcPath = path.join(__dirname, "config", src);
+      const srcPath = path.join(STABLE_CONFIG_DIR, src);
       if (fs.existsSync(srcPath)) {
         const destPath = path.join(targetPath, dest);
         fs.mkdirSync(path.dirname(destPath), { recursive: true });
@@ -271,7 +348,7 @@ async function main() {
       paths.agents ? `Agents: ${stats.agents} ${mode}` : null,
       ...Object.values(tool.rootFiles).map((f) => `${f}: ${mode}`),
       ...Object.values(tool.configFiles).map((f) => `${f}: copied`),
-      useSymlinks ? `.gitignore: entries added` : `.gitignore: not modified`,
+      useSymlinks ? `.gitignore: entries added` : `.gitignore: not modified (files committed via .mvagnon/agents/)`,
     ].filter(Boolean);
 
     summaryLines.push({ tool, lines: toolSummary });
@@ -334,6 +411,7 @@ async function linkMatchingItems(
     filterExtension,
     directoriesOnly,
     copiedItems = [],
+    copyAll = false,
     intermediateDir,
     safeCopy,
     processedIntermediateFiles = new Set(),
@@ -354,7 +432,7 @@ async function linkMatchingItems(
 
     if (!shouldInclude(name, selectedTechs, selectedArchs)) continue;
 
-    const isCopied = copiedItems.includes(name) && intermediateDir;
+    const isCopied = (copyAll || copiedItems.includes(name)) && intermediateDir;
 
     if (isCopied) {
       const intermediatePath = path.join(intermediateDir, entry);
@@ -418,6 +496,12 @@ function createSymlink(source, target) {
   fs.symlinkSync(source, target);
 }
 
+function createRelativeSymlink(source, target) {
+  removePath(target);
+  const relPath = path.relative(path.dirname(target), source);
+  fs.symlinkSync(relPath, target);
+}
+
 function copyPath(source, target) {
   removePath(target);
 
@@ -464,6 +548,104 @@ function addGitignoreEntry(targetPath, entry, sectionComment) {
   }
   content += entry + "\n";
   fs.writeFileSync(gitignorePath, content);
+}
+
+/**
+ * Update files in .mvagnon/agents/ that already exist with their latest
+ * version from the stable config dir. Only touches existing files (respects
+ * what was selected at bootstrap time). Removes local files whose source
+ * no longer exists upstream.
+ */
+function upgradeLocalIntermediateDir(localDir) {
+  const updated = [];
+  const removed = [];
+
+  for (const entry of fs.readdirSync(localDir)) {
+    const localPath = path.join(localDir, entry);
+    const stat = fs.statSync(localPath);
+
+    if (stat.isDirectory()) {
+      // Subdirectory: rules/, skills/, agents/
+      const sourceSubdir = path.join(STABLE_CONFIG_DIR, entry);
+
+      for (const item of fs.readdirSync(localPath)) {
+        const localItem = path.join(localPath, item);
+        const sourceItem = path.join(sourceSubdir, item);
+
+        if (!fs.existsSync(sourceItem)) {
+          fs.rmSync(localItem, { recursive: true, force: true });
+          removed.push(path.join(entry, item));
+          continue;
+        }
+
+        if (fs.statSync(sourceItem).isDirectory()) {
+          if (syncDirectory(sourceItem, localItem)) {
+            updated.push(path.join(entry, item));
+          }
+        } else {
+          if (syncFile(sourceItem, localItem)) {
+            updated.push(path.join(entry, item));
+          }
+        }
+      }
+    } else {
+      // Root-level file (e.g. AGENTS.md)
+      const sourceFile = path.join(STABLE_CONFIG_DIR, entry);
+
+      if (!fs.existsSync(sourceFile)) {
+        fs.rmSync(localPath, { force: true });
+        removed.push(entry);
+        continue;
+      }
+
+      if (syncFile(sourceFile, localPath)) {
+        updated.push(entry);
+      }
+    }
+  }
+
+  return { updated, removed };
+}
+
+function syncFile(source, target) {
+  const srcContent = fs.readFileSync(source);
+  const tgtContent = fs.readFileSync(target);
+  if (!srcContent.equals(tgtContent)) {
+    fs.copyFileSync(source, target);
+    return true;
+  }
+  return false;
+}
+
+function syncDirectory(source, target) {
+  let changed = false;
+
+  for (const entry of fs.readdirSync(source)) {
+    const srcPath = path.join(source, entry);
+    const tgtPath = path.join(target, entry);
+
+    if (fs.statSync(srcPath).isDirectory()) {
+      fs.mkdirSync(tgtPath, { recursive: true });
+      if (syncDirectory(srcPath, tgtPath)) changed = true;
+    } else {
+      if (!fs.existsSync(tgtPath)) {
+        fs.copyFileSync(srcPath, tgtPath);
+        changed = true;
+      } else if (syncFile(srcPath, tgtPath)) {
+        changed = true;
+      }
+    }
+  }
+
+  // Remove files in target that no longer exist in source
+  for (const entry of fs.readdirSync(target)) {
+    if (!fs.existsSync(path.join(source, entry))) {
+      fs.rmSync(path.join(target, entry), { recursive: true, force: true });
+      changed = true;
+    }
+  }
+
+  return changed;
 }
 
 main().catch(console.error);

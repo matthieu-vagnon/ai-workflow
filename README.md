@@ -47,7 +47,7 @@ The script prompts you to:
 
 1. **Select technologies** — filter rules by stack (React, TypeScript)
 2. **Select architecture** — optional (e.g. Hexagonal)
-3. **Choose mode** — symlinks (recommended) or copy files
+3. **Choose mode** — external symlinks (auto-updates) or local copies with relative links (git-tracked)
 4. **Select target tools** — one or more (Claude Code, OpenCode, Cursor, Codex)
 
 ```
@@ -60,7 +60,9 @@ AI Workflow → /Users/you/projects/my-app
 ◆ Select custom architecture
 │ ● None
 
-◆ Use symlinks? Yes
+◆ How should agent files be linked to your project?
+│ ● Symlinks to ~/.config - Auto-updates across all projects · not tracked in git
+│ ○ Copied locally + relative links - Tracked in git, shareable with team · updated per project
 
 ◆ Select target tools
 │ [x] Claude Code
@@ -115,14 +117,42 @@ Items without a technology or architecture prefix are considered generic and alw
 | Hexagonal    | Generic + items containing `hexagonal` |
 | React + Both | Generic + `react-*.md` + `ts-*.md`     |
 
-## Symlinks vs Copy
+## Stable Configuration Directory
 
-| Mode     | Pros                                | Cons                          |
-| -------- | ----------------------------------- | ----------------------------- |
-| Symlinks | Centralized updates, no duplication | Requires source repo presence |
-| Copy     | Self-contained, portable            | Manual updates needed         |
+When using `npx`, the package is cached in a temporary directory (`~/.npm/_npx/<hash>/...`) that changes when the cache is cleared or the version is updated. To prevent symlinks from breaking, the bootstrap script copies all configuration files to a stable location:
 
-Items listed in `COPIED_RULES`, `COPIED_SKILLS`, or `COPIED_AGENTS` are always copied (never symlinked) to allow per-project customization.
+```
+~/.config/mvagnon-agents/config/
+```
+
+This directory is automatically created and synchronized on every bootstrap run. All symlinks in your projects point to this stable path instead of the ephemeral npx cache.
+
+### Upgrading
+
+To update the stable configuration after installing a new version of the package:
+
+```bash
+npx mvagnon-agents upgrade
+```
+
+This synchronizes the config files to `~/.config/mvagnon-agents/config/`, which immediately updates all projects using external symlinks. If run from a project that uses local copies (`.mvagnon/agents/` exists), it also updates the local files.
+
+### Migration for Existing Users
+
+If you set up your project before this feature was introduced, re-run the bootstrap command once to update your symlinks to point to the stable directory:
+
+```bash
+npx -y mvagnon-agents ../my-project
+```
+
+## Symlinks vs Local Copies
+
+| Mode | How it works | Pros | Cons |
+| --- | --- | --- | --- |
+| **External symlinks** | Tool dirs symlink to `~/.config/mvagnon-agents/` | Auto-updates across all projects on `upgrade` | Not tracked in git |
+| **Local copies + relative links** | Files copied to `.mvagnon/agents/`, tool dirs use relative symlinks to it | Tracked in git, shareable with team | Updated per project on `upgrade` |
+
+In both modes, items listed in `COPIED_RULES`, `COPIED_SKILLS`, or `COPIED_AGENTS` are copied to `.mvagnon/agents/` to allow per-project customization. Config files (`.mcp.json`, `opencode.json`, etc.) are always copied directly.
 
 ## Manual Installation
 
