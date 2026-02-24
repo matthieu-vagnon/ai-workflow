@@ -560,6 +560,12 @@ function upgradeLocalIntermediateDir(localDir) {
   const updated = [];
   const removed = [];
 
+  const copiedByDir = {
+    rules: COPIED_RULES,
+    skills: COPIED_SKILLS,
+    agents: COPIED_AGENTS,
+  };
+
   for (const entry of fs.readdirSync(localDir)) {
     const localPath = path.join(localDir, entry);
     const stat = fs.statSync(localPath);
@@ -567,10 +573,15 @@ function upgradeLocalIntermediateDir(localDir) {
     if (stat.isDirectory()) {
       // Subdirectory: rules/, skills/, agents/
       const sourceSubdir = path.join(STABLE_CONFIG_DIR, entry);
+      const copiedItems = copiedByDir[entry] || [];
 
       for (const item of fs.readdirSync(localPath)) {
         const localItem = path.join(localPath, item);
         const sourceItem = path.join(sourceSubdir, item);
+        const itemName = item.replace(/\.md$/, "");
+
+        // Skip per-project customizable items
+        if (copiedItems.includes(itemName)) continue;
 
         if (!fs.existsSync(sourceItem)) {
           fs.rmSync(localItem, { recursive: true, force: true });
