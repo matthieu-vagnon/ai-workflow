@@ -7,4 +7,4 @@ url = "https://mcp.context7.com/mcp"
 enabled = true
 
 [mcp_servers.context7.http_headers]
-CONTEXT7_API_KEY = "ctx7sk-09be8e62-174a-424a-81ef-166f2b2c94a2"
+CONTEXT7_API_KEY = "your-api-key"

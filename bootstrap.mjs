@@ -4,7 +4,7 @@ import * as p from "@clack/prompts";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncConfigToStableDir, STABLE_CONFIG_DIR } from "./lib/sync.mjs";
+import { STABLE_CONFIG_DIR, syncConfigToStableDir } from "./lib/sync.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -99,7 +99,8 @@ async function main() {
   // --- Upgrade subcommand ---
   if (targetArg === "upgrade") {
     const report = syncConfigToStableDir(__dirname);
-    const globalChanged = report.added.length || report.updated.length || report.removed.length;
+    const globalChanged =
+      report.added.length || report.updated.length || report.removed.length;
 
     console.log(`\n~/.config synced (v${report.version}):`);
     if (report.added.length)
@@ -130,9 +131,13 @@ async function main() {
     if (!globalChanged && !localChanged) {
       console.log("Already up to date.");
     } else if (globalChanged && hasLocalDir && localChanged) {
-      console.log("Agent instructions updated in all symlinked projects and in this project.");
+      console.log(
+        "Agent instructions updated in all symlinked projects and in this project.",
+      );
     } else if (globalChanged && hasLocalDir && !localChanged) {
-      console.log("Agent instructions updated in all symlinked projects. This project was already up to date.");
+      console.log(
+        "Agent instructions updated in all symlinked projects. This project was already up to date.",
+      );
     } else if (globalChanged) {
       console.log("Agent instructions updated in all symlinked projects.");
     } else if (localChanged) {
@@ -242,7 +247,11 @@ async function main() {
     ? async (src, tgt) => createSymlink(src, tgt)
     : async (src, tgt) => createRelativeSymlink(src, tgt);
 
-  s.start(useSymlinks ? "Creating symlinks" : "Copying files + creating relative links");
+  s.start(
+    useSymlinks
+      ? "Creating symlinks"
+      : "Copying files + creating relative links",
+  );
 
   const mode = useSymlinks ? "linked" : "copied + linked";
   const summaryLines = [];
@@ -348,7 +357,9 @@ async function main() {
       paths.agents ? `Agents: ${stats.agents} ${mode}` : null,
       ...Object.values(tool.rootFiles).map((f) => `${f}: ${mode}`),
       ...Object.values(tool.configFiles).map((f) => `${f}: copied`),
-      useSymlinks ? `.gitignore: entries added` : `.gitignore: not modified (files committed via .mvagnon/agents/)`,
+      useSymlinks
+        ? `.gitignore: entries added`
+        : `.gitignore: not modified (files committed via .mvagnon/agents/)`,
     ].filter(Boolean);
 
     summaryLines.push({ tool, lines: toolSummary });
@@ -362,8 +373,9 @@ async function main() {
 
   p.note(
     [
-      "1. Modify `project.md` to add project-specific rules;",
-      "2. Add rules, skills, agents, MCPs or plugins based on your needs for each tool.",
+      "1. Add your Context7 and Exa MCPs API keys in the configuration files;",
+      "2. Modify `project.md` to add project-specific rules;",
+      "3. Add rules, skills, agents, MCPs or plugins based on your needs for each tool.",
     ].join("\n"),
     "Next Steps",
   );
