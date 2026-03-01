@@ -1,6 +1,6 @@
 {
   "name": "mvagnon-agents",
-  "version": "1.2.1",
+  "version": "2.0.0",
   "description": "Shared configuration and conventions to bootstrap AI coding assistants.",
   "type": "module",
   "bin": {
@@ -13,7 +13,8 @@
   ],
   "scripts": {
     "bootstrap": "node bootstrap.mjs",
-    "upgrade": "node bootstrap.mjs upgrade"
+    "upgrade": "node bootstrap.mjs upgrade",
+    "manage": "node bootstrap.mjs manage"
   },
   "keywords": [
     "ai",
@@ -22,9 +23,7 @@
     "cursor",
     "opencode",
     "codex",
-    "bootstrap",
-    "typescript",
-    "react"
+    "bootstrap"
   ],
   "repository": {
     "type": "git",
