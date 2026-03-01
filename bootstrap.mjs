@@ -8,10 +8,16 @@ import {
   STABLE_CONFIG_DIR,
   syncConfigToStableDir,
 } from "./lib/sync.mjs";
+import {
+  loadApiKeys,
+  saveApiKeys,
+  scanPlaceholders,
+  replacePlaceholders,
+} from "./lib/apikeys.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const INTERMEDIATE_DIR = ".mvagnon/agents";
+const INTERMEDIATE_DIR = ".mvagnon-agents";
 
 const TOOLS = {
   claudecode: {
@@ -96,10 +102,16 @@ async function main() {
     });
   }
 
+  if (targetArg === "keys") {
+    const { runKeys } = await import("./lib/keys.mjs");
+    return runKeys();
+  }
+
   if (!targetArg) {
     console.error("Usage: npx mvagnon-agents <target-path>");
     console.error("       npx mvagnon-agents upgrade");
     console.error("       npx mvagnon-agents manage");
+    console.error("       npx mvagnon-agents keys");
     process.exit(1);
   }
 
@@ -200,6 +212,37 @@ async function main() {
     process.exit(0);
   }
 
+  // Step 6: API keys — scan config files for placeholders, prompt for missing keys
+  const configFilePaths = [];
+  for (const tool of selectedTools) {
+    for (const src of Object.keys(tool.configFiles)) {
+      configFilePaths.push(path.join(STABLE_CONFIG_DIR, src));
+    }
+  }
+  const neededKeys = scanPlaceholders(configFilePaths);
+  const apiKeys = loadApiKeys();
+  let newKeysAdded = false;
+
+  if (neededKeys.size > 0) {
+    for (const name of neededKeys) {
+      if (apiKeys[name]) continue;
+      const value = await p.password({
+        message: `API key for ${name} (empty to skip)`,
+      });
+      if (p.isCancel(value)) {
+        p.cancel("Setup cancelled");
+        process.exit(0);
+      }
+      if (value) {
+        apiKeys[name] = value;
+        newKeysAdded = true;
+      }
+    }
+    if (newKeysAdded) {
+      saveApiKeys(apiKeys);
+    }
+  }
+
   const s = p.spinner();
   s.start("Copying files + creating relative links");
 
@@ -251,7 +294,7 @@ async function main() {
       if (fs.existsSync(srcPath)) {
         const destPath = path.join(targetPath, dest);
         fs.mkdirSync(path.dirname(destPath), { recursive: true });
-        await copyWithConfirm(srcPath, destPath, {
+        await copyConfigWithReplacements(srcPath, destPath, apiKeys, {
           spinner: s,
           projectRoot: targetPath,
         });
@@ -276,7 +319,7 @@ async function main() {
     summaryLines.push({ tool, lines: toolSummary });
   }
 
-  addGitignoreEntry(targetPath, INTERMEDIATE_DIR, "mvagnon/agents", !addGitignore);
+  addGitignoreEntry(targetPath, INTERMEDIATE_DIR, "mvagnon-agents", !addGitignore);
 
   s.stop("Setup complete");
 
@@ -293,24 +336,32 @@ async function main() {
     }
   }
 
-  const nextSteps = [
-    "1. Add your Context7 and Exa MCPs API keys in the configuration files;",
-  ];
+  // Check for unresolved placeholders
+  const unresolvedKeys = [...neededKeys].filter((k) => !apiKeys[k]);
+
+  const nextSteps = [];
+  let stepNum = 1;
+
+  if (unresolvedKeys.length > 0) {
+    nextSteps.push(
+      `${stepNum}. Add your ${unresolvedKeys.join(", ")} API key(s) via: npx mvagnon-agents keys`,
+    );
+    stepNum++;
+  }
+
   if (projectSensitiveFiles.length > 0) {
     nextSteps.push(
-      "2. Modify the following project-sensitive files to fit your project:",
+      `${stepNum}. Modify the following project-sensitive files to fit your project:`,
     );
     for (const f of projectSensitiveFiles) {
       nextSteps.push(`   - ${f}`);
     }
-    nextSteps.push(
-      `${projectSensitiveFiles.length > 0 ? "3" : "2"}. Add rules, skills, agents, MCPs or plugins based on your needs for each tool.`,
-    );
-  } else {
-    nextSteps.push(
-      "2. Add rules, skills, agents, MCPs or plugins based on your needs for each tool.",
-    );
+    stepNum++;
   }
+
+  nextSteps.push(
+    `${stepNum}. Add rules, skills, agents, MCPs or plugins based on your needs for each tool.`,
+  );
 
   p.note(nextSteps.join("\n"), "Next Steps");
   p.outro("Done");
@@ -428,6 +479,38 @@ async function copyWithConfirm(source, target, { spinner, projectRoot } = {}) {
   }
 
   copyPath(source, target);
+  return true;
+}
+
+async function copyConfigWithReplacements(source, target, apiKeys, { spinner, projectRoot } = {}) {
+  if (fs.existsSync(target)) {
+    try {
+      if (!fs.lstatSync(target).isSymbolicLink()) {
+        const label = projectRoot
+          ? path.relative(projectRoot, target)
+          : path.basename(target);
+        if (spinner) spinner.stop("Existing file found");
+        const overwrite = await p.confirm({
+          message: `${label} already exists. Overwrite?`,
+          initialValue: false,
+        });
+        if (p.isCancel(overwrite)) {
+          p.cancel("Setup cancelled");
+          process.exit(0);
+        }
+        if (spinner) spinner.start("Continuing setup");
+        if (!overwrite) return false;
+      }
+    } catch {
+      // lstat failed, proceed with copy
+    }
+  }
+
+  const content = fs.readFileSync(source, "utf-8");
+  const replaced = replacePlaceholders(content, apiKeys);
+  removePath(target);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, replaced, "utf-8");
   return true;
 }
 

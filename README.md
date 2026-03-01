@@ -51,6 +51,14 @@ cd my-project
 npx mvagnon-agents manage
 ```
 
+### API Keys
+
+Manage API keys stored in `~/.config/mvagnon/agents/config.json`. Keys are automatically injected into config files during bootstrap and manage, replacing `{ServiceName}` placeholders.
+
+```bash
+npx mvagnon-agents keys
+```
+
 ### Interactive Walkthrough
 
 The script prompts you to:
@@ -131,13 +139,13 @@ lib/
 
 Files are organized into two categories:
 
-- **project-sensitive** — copied to `.mvagnon/agents/<category>/` and meant to be edited per project. Never overwritten on upgrade.
-- **generic** — copied to `.mvagnon/agents/generic/<category>/` and kept in sync with the package. Updated on upgrade.
+- **project-sensitive** — copied to `.mvagnon-agents/<category>/` and meant to be edited per project. Never overwritten on upgrade.
+- **generic** — copied to `.mvagnon-agents/generic/<category>/` and kept in sync with the package. Updated on upgrade.
 
-Tool directories (`.claude/rules/`, `.cursor/rules/`, etc.) contain relative symlinks pointing into `.mvagnon/agents/`. This means all tools share the same source files.
+Tool directories (`.claude/rules/`, `.cursor/rules/`, etc.) contain relative symlinks pointing into `.mvagnon-agents/`. This means all tools share the same source files.
 
 ```
-.mvagnon/agents/
+.mvagnon-agents/
 ├── AGENTS.md                              # Root file
 ├── rules/
 │   └── project.md                         # Project-sensitive (editable)
