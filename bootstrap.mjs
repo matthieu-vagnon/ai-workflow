@@ -179,26 +179,38 @@ async function main() {
 
     if (projectSensitive.length === 0 && generic.length === 0) continue;
 
-    if (generic.length > 0) {
-      const options = generic.map((name) => ({
-        value: name,
+    const options = [
+      ...projectSensitive.map((name) => ({
+        value: `ps:${name}`,
+        label: name,
+        hint: "project-sensitive — will need to be modified for your project",
+      })),
+      ...generic.map((name) => ({
+        value: `gen:${name}`,
         label: name,
         initialSelected: true,
-      }));
+      })),
+    ];
 
-      const selected = await p.multiselect({
-        message: `Pick ${category}`,
-        options,
-        required: false,
-      });
-      if (p.isCancel(selected)) {
-        p.cancel("Setup cancelled");
-        process.exit(0);
-      }
-      selections[category] = { projectSensitive, generic: selected || [] };
-    } else {
-      selections[category] = { projectSensitive, generic: [] };
+    const selected = await p.multiselect({
+      message: `Pick ${category}`,
+      options,
+      required: false,
+    });
+    if (p.isCancel(selected)) {
+      p.cancel("Setup cancelled");
+      process.exit(0);
     }
+
+    const chosen = selected || [];
+    selections[category] = {
+      projectSensitive: chosen
+        .filter((v) => v.startsWith("ps:"))
+        .map((v) => v.slice(3)),
+      generic: chosen
+        .filter((v) => v.startsWith("gen:"))
+        .map((v) => v.slice(4)),
+    };
   }
 
   // Step 5: Gitignore question
