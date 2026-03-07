@@ -58,7 +58,7 @@ npx mvagnon-agents manage
 
 ### API Keys
 
-Manage API keys stored in `~/.config/mvagnon/agents/config.json`. Keys are automatically injected into config files during bootstrap and manage, replacing `{ServiceName}` placeholders.
+Manage API keys stored in `~/.config/mvagnon/agents/config.json`. Keys are injected into config files during bootstrap and manage, replacing `{ServiceName}` placeholders. Changing a key only affects future bootstraps — already deployed projects are not updated.
 
 ```bash
 npx mvagnon-agents keys
@@ -69,10 +69,9 @@ npx mvagnon-agents keys
 The script prompts you to:
 
 1. **Select target tools** — one or more (Claude Code, OpenCode, Cursor, Codex)
-2. **Select rules** — pick from generic rules (project-sensitive rules are always included)
-3. **Select skills** — pick from generic skills (skipped if none available)
-4. **Select agents** — pick from generic agents (skipped if none available)
-5. **Add to .gitignore?** — yes to ignore tool directories, no to track everything
+2. **Pick resources** — rules, skills and agents in a single menu, with category hints
+3. **Add to .gitignore?** — yes to ignore tool directories, no to track everything
+4. **API keys** — prompted automatically for any missing `{ServiceName}` placeholders
 
 ```
 AI Workflow → /Users/you/projects/my-app
@@ -83,12 +82,14 @@ AI Workflow → /Users/you/projects/my-app
 │ [ ] OpenCode
 │ [ ] Codex
 
-◆ Select rules (project.md always included as project-sensitive)
-│ [x] nestjs-hexagonal-architecture.md
-│ [ ] react-hexagonal-architecture.md
-│ [ ] fastapi-hexagonal-architecture.md
+◆ Pick resources
+│ [x] project.md                            (rules · project-sensitive)
+│ [x] nestjs-hexagonal-architecture.md      (rules)
+│ [ ] react-hexagonal-architecture.md       (rules)
+│ [ ] fastapi-hexagonal-architecture.md     (rules)
+│ [x] documentation-writer                  (skills)
 
-◆ Add tool directories to .gitignore?
+◆ Add agents configuration to .gitignore?
 │ ○ No
 
 ◇ Claude Code Setup
@@ -104,10 +105,15 @@ AI Workflow → /Users/you/projects/my-app
 │ .gitignore: not modified
 
 ◇ Next Steps
-│ 1. Add your Context7 and Exa MCPs API keys in the configuration files;
-│ 2. Modify the following project-sensitive files to fit your project:
+│ 1. Modify the following project-sensitive files to fit your project:
 │    - rules/project.md
-│ 3. Add rules, skills, agents, MCPs or plugins based on your needs for each tool.
+│ 2. Add rules, skills, agents, MCPs or plugins based on your needs for each tool.
+
+◇ Available Commands
+│ npx mvagnon-agents <path>    Bootstrap a project with AI tool configs
+│ npx mvagnon-agents manage    Add tools, rules, skills or agents to an existing project
+│ npx mvagnon-agents upgrade   Sync generic resources with the latest package version
+│ npx mvagnon-agents keys      Manage API keys for future bootstraps (~/.config/mvagnon/agents/)
 
 Done
 ```

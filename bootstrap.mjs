@@ -121,7 +121,7 @@ async function main() {
 
   if (targetArg === "keys") {
     const { runKeys } = await import("./lib/keys.mjs");
-    return runKeys();
+    return runKeys({ VERSION });
   }
 
   if (!targetArg) {
@@ -188,31 +188,35 @@ async function main() {
     }
   }
 
-  // Steps 2-4: Select items for each category
-  const selections = {};
+  // Step 2: Select resources (rules, skills, agents in one menu)
+  const allResourceOptions = [];
   for (const category of CATEGORIES) {
     if (!supportedCategories.has(category)) continue;
 
     const { projectSensitive, generic } = scanAvailableItems(category);
 
-    if (projectSensitive.length === 0 && generic.length === 0) continue;
-
-    const options = [
-      ...projectSensitive.map((name) => ({
-        value: `ps:${name}`,
+    for (const name of projectSensitive) {
+      allResourceOptions.push({
+        value: `ps:${category}:${name}`,
         label: name,
-        hint: "project-sensitive — will need to be modified for your project",
-      })),
-      ...generic.map((name) => ({
-        value: `gen:${name}`,
+        hint: `${category} · project-sensitive`,
+      });
+    }
+    for (const name of generic) {
+      allResourceOptions.push({
+        value: `gen:${category}:${name}`,
         label: name,
+        hint: category,
         initialSelected: true,
-      })),
-    ];
+      });
+    }
+  }
 
+  const selections = {};
+  if (allResourceOptions.length > 0) {
     const selected = await p.multiselect({
-      message: `Pick ${category}`,
-      options,
+      message: "Pick resources",
+      options: allResourceOptions,
       required: false,
     });
     if (p.isCancel(selected)) {
@@ -220,15 +224,14 @@ async function main() {
       process.exit(0);
     }
 
-    const chosen = selected || [];
-    selections[category] = {
-      projectSensitive: chosen
-        .filter((v) => v.startsWith("ps:"))
-        .map((v) => v.slice(3)),
-      generic: chosen
-        .filter((v) => v.startsWith("gen:"))
-        .map((v) => v.slice(4)),
-    };
+    for (const val of selected || []) {
+      const [type, category, ...nameParts] = val.split(":");
+      const name = nameParts.join(":");
+      if (!selections[category])
+        selections[category] = { projectSensitive: [], generic: [] };
+      if (type === "ps") selections[category].projectSensitive.push(name);
+      else selections[category].generic.push(name);
+    }
   }
 
   // Step 5: Gitignore question
@@ -401,6 +404,15 @@ async function main() {
   );
 
   p.note(nextSteps.join("\n"), "Next Steps");
+
+  const commands = [
+    "npx mvagnon-agents <path>    Bootstrap a project with AI tool configs",
+    "npx mvagnon-agents manage    Add tools, rules, skills or agents to an existing project",
+    "npx mvagnon-agents upgrade   Sync generic resources with the latest package version",
+    "npx mvagnon-agents keys      Manage API keys for future bootstraps (~/.config/mvagnon/agents/)",
+  ];
+  p.note(commands.join("\n"), "Available Commands");
+
   p.outro("Done");
 }
 
