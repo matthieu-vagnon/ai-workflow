@@ -177,15 +177,6 @@ Tool directories (`.claude/rules/`, `.cursor/rules/`, etc.) contain relative sym
 
 API keys are stored in `~/.config/mvagnon/agents/config.json`. This is the only persistent data stored outside the project — configuration files are read directly from the package at runtime.
 
-## Publishing
-
-Publish is triggered automatically via GitHub Actions on tag push:
-
-```bash
-npm version patch   # bumps version, creates commit + tag
-git push && git push --tags
-```
-
 ## Recommended Claude Code Hooks
 
 Claude Code supports `PostToolUse` hooks that automatically lint and format files after every `Edit` or `Write`. Add the following to your `~/.claude/settings.json` to enable auto-formatting across all projects:
