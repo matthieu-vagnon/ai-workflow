@@ -132,7 +132,8 @@ config/
 ├── skills/
 │   ├── project-sensitive/                        # Per-project skills
 │   └── generic/
-│       └── documentation-writer/                 # Documentation writing skill
+│       ├── documentation-writer/                 # Documentation writing skill
+│       └── docs-lookup/                          # External library docs lookup
 ├── agents/
 │   ├── project-sensitive/                        # Per-project agents
 │   └── generic/                                  # Shared agents
@@ -170,7 +171,8 @@ Tool directories (`.claude/rules/`, `.cursor/rules/`, etc.) contain relative sym
     │   ├── react-hexagonal-architecture.md
     │   └── fastapi-hexagonal-architecture.md
     └── skills/
-        └── documentation-writer/
+        ├── documentation-writer/
+        └── docs-lookup/
 ```
 
 ### Configuration Storage
