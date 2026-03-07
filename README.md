@@ -134,8 +134,8 @@ config/
 │   │   ├── documentation-writer/                 # Documentation writing skill
 │   │   └── docs-lookup/                          # External library docs lookup
 │   └── dep-sensitive/
-│       └── {dependency}/                         # Folder per dependency (e.g. react/)
-│           └── {skill-name}/                     # Skills requiring that dependency
+│       └── Playwright MCP/
+│           └── ui-check/                         # UI verification via Playwright
 ├── agents/                                       # Reserved (empty)
 ├── AGENTS.md                                     # Master rules for all agents
 ├── claudecode.settings.json                      # Claude Code MCP config
