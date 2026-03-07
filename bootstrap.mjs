@@ -27,7 +27,6 @@ const TOOLS = {
     paths: {
       rules: ".claude/rules",
       skills: ".claude/skills",
-      agents: ".claude/agents",
     },
     rootFiles: { "AGENTS.md": "CLAUDE.md" },
     configFiles: { "claudecode.settings.json": ".mcp.json" },
@@ -41,7 +40,6 @@ const TOOLS = {
     paths: {
       rules: ".opencode/rules",
       skills: ".opencode/skills",
-      agents: ".opencode/agents",
     },
     rootFiles: { "AGENTS.md": "AGENTS.md" },
     configFiles: { "opencode.settings.json": "opencode.json" },
@@ -55,7 +53,6 @@ const TOOLS = {
     paths: {
       rules: ".cursor/rules",
       skills: ".cursor/skills",
-      agents: ".cursor/agents",
     },
     rootFiles: {},
     configFiles: { "cursor.mcp.json": ".cursor/mcp.json" },
@@ -75,7 +72,7 @@ const TOOLS = {
   },
 };
 
-const CATEGORIES = ["rules", "skills", "agents"];
+const CATEGORIES = ["rules", "skills"];
 
 async function main() {
   const targetArg = process.argv[2];
@@ -214,7 +211,7 @@ async function main() {
     }
   }
 
-  // Step 2: Select resources (rules, skills, agents in one menu)
+  // Step 2: Select resources (rules, skills in one menu)
   const allResourceOptions = [];
   for (const category of CATEGORIES) {
     if (!supportedCategories.has(category)) continue;
@@ -309,7 +306,7 @@ async function main() {
   const processedIntermediateFiles = new Set();
 
   for (const tool of selectedTools) {
-    const stats = { rules: 0, skills: 0, agents: 0 };
+    const stats = { rules: 0, skills: 0 };
     const { paths } = tool;
 
     for (const dir of Object.values(paths)) {
@@ -367,9 +364,6 @@ async function main() {
       paths.skills && stats.skills > 0
         ? `Skills: ${stats.skills} linked`
         : null,
-      paths.agents && stats.agents > 0
-        ? `Agents: ${stats.agents} linked`
-        : null,
       ...Object.values(tool.rootFiles).map((f) => `${f}: linked`),
       ...Object.values(tool.configFiles).map((f) => `${f}: copied`),
       addGitignore
@@ -426,7 +420,7 @@ async function main() {
   }
 
   nextSteps.push(
-    `${stepNum}. Add rules, skills, agents, MCPs or plugins based on your needs for each tool.`,
+    `${stepNum}. Add rules, skills, MCPs or plugins based on your needs for each tool.`,
   );
   stepNum++;
 
@@ -436,7 +430,7 @@ async function main() {
 
   const commands = [
     "npx mvagnon-agents <path>    Bootstrap a project with AI tool configs",
-    "npx mvagnon-agents manage    Add tools, rules, skills or agents to an existing project",
+    "npx mvagnon-agents manage    Add tools, rules or skills to an existing project",
     "npx mvagnon-agents upgrade   Sync generic resources with the latest package version",
     "npx mvagnon-agents keys      Manage API keys for future bootstraps (~/.config/mvagnon/agents/)",
   ];

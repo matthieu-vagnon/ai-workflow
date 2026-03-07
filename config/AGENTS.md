@@ -12,13 +12,12 @@ You don't need any confirmation, you can go straight into the work, using the re
 
 ## Code Rules
 
-- Group all imports in one block, no blank lines between them;
-- Separate logical blocks with one blank line;
+- Separate logical blocks (imports, hooks, statements, functions, etc.) with one blank line;
 - TSDoc/docstrings on exported functions/classes/types;
-- NO comments on trivial logic; ALWAYS comment complex logic (regex, etc.);
+- NO comments on trivial logic; ALWAYS comment complex logic only (regex, etc.);
 - NO logs unless explicitly requested;
 - ALWAYS apply DRY, KISS and SOLID principles;
-- DO NOT imitate existing code patterns.
+- DO NOT imitate existing code patterns (logs, comments, spacing, etc.).
 
 ## Checklist
 
