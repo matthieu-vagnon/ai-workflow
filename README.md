@@ -186,6 +186,47 @@ npm version patch   # bumps version, creates commit + tag
 git push && git push --tags
 ```
 
+## Recommended Claude Code Hooks
+
+Claude Code supports `PostToolUse` hooks that automatically lint and format files after every `Edit` or `Write`. Add the following to your `~/.claude/settings.json` to enable auto-formatting across all projects:
+
+```jsonc
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            // JS/TS: ESLint fix then Prettier (sequential to avoid race conditions)
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path | select(test(\"\\\\.([jt]sx?|mjs|cjs)$\"))' | xargs -I {} sh -c 'npx eslint --fix \"$1\" && npx prettier --write \"$1\"' _ {}",
+          },
+          {
+            // Other files (md, json, css, etc.): Prettier only
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path | select(test(\"\\\\.([jt]sx?|mjs|cjs)$\") | not)' | xargs npx prettier --write --ignore-unknown",
+          },
+          {
+            // Python: Ruff check then format (sequential to avoid race conditions)
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path | select(test(\"\\\\.py$\"))' | xargs -I {} sh -c 'uvx ruff check --fix \"$1\" && uvx ruff format \"$1\"' _ {}",
+          },
+        ],
+      },
+    ],
+  },
+}
+```
+
+> **Why sequential?** Claude Code runs hooks in parallel. Tools that write to the same file (e.g. ESLint + Prettier, or Ruff check + Ruff format) must be chained with `&&` inside a single hook to prevent race conditions.
+
+### Prerequisites
+
+- **Node.js** (for `npx eslint` and `npx prettier`)
+- **uv** (for `uvx ruff`) — install via `curl -LsSf https://astral.sh/uv/install.sh | sh`
+- Project-level ESLint and Prettier configs (`.eslintrc.*` / `eslint.config.*`, `.prettierrc*`) for JS/TS rules to take effect
+
 ## Manual Installation
 
 If you prefer not to use the bootstrap script:
