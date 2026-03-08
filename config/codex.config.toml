@@ -1,10 +1,14 @@
-[mcp_servers.exa]
-url = "https://mcp.exa.ai/mcp"
-enabled = true
-
 [mcp_servers.context7]
 url = "https://mcp.context7.com/mcp"
 enabled = true
 
+[mcp_servers.brave]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-brave-search"]
+enabled = true
+
 [mcp_servers.context7.env_http_headers]
 CONTEXT7_API_KEY = "CONTEXT7_API_KEY"
+
+[mcp_servers.brave.env]
+BRAVE_API_KEY = "${BRAVE_API_KEY}"
