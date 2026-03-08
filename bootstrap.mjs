@@ -697,6 +697,9 @@ function addGitignoreEntry(
     content += `# ${sectionComment}\n`;
   }
   content += effectiveEntry + "\n";
+  if (exceptions) {
+    content += `!${entry}/**` + "\n";
+  }
   fs.writeFileSync(gitignorePath, content);
 }
 
