@@ -56,14 +56,6 @@ cd my-project
 npx mvagnon-agents manage
 ```
 
-### API Keys
-
-Manage API keys stored in `~/.config/mvagnon/agents/config.json`. Keys are injected into config files during bootstrap and manage, replacing `{ServiceName}` placeholders. Changing a key only affects future bootstraps — already deployed projects are not updated.
-
-```bash
-npx mvagnon-agents keys
-```
-
 ### Interactive Walkthrough
 
 The script prompts you to:
@@ -71,7 +63,6 @@ The script prompts you to:
 1. **Select target tools** — one or more (Claude Code, OpenCode, Cursor, Codex)
 2. **Pick resources** — rules, skills and agents in a single menu, with category hints
 3. **Add to .gitignore?** — yes to ignore tool directories, no to track everything
-4. **API keys** — prompted automatically for any missing `{ServiceName}` placeholders
 
 ```
 AI Workflow → /Users/you/projects/my-app
@@ -96,24 +87,26 @@ AI Workflow → /Users/you/projects/my-app
 │ Rules:      2 linked
 │ Skills:     1 linked
 │ CLAUDE.md:  linked
-│ .mcp.json:  copied
+│ .mcp.json:  copied (gitignored)
+│ .mvagnon-agents/claudecode.settings.json: .example copied
 │ .gitignore: not modified
 
 ◇ Cursor Setup
 │ Rules:      2 linked
-│ .cursor/mcp.json: copied
+│ .cursor/mcp.json: copied (gitignored)
+│ .mvagnon-agents/cursor.mcp.json: .example copied
 │ .gitignore: not modified
 
 ◇ Next Steps
-│ 1. Modify the following project-sensitive files to fit your project:
+│ 1. Set the following environment variables for MCP config:
+│    export CONTEXT7_API_KEY=<your-key>
+│ 2. Modify the following project-sensitive files to fit your project:
 │    - rules/project.md
-│ 2. Add rules, skills, agents, MCPs or plugins based on your needs for each tool.
+│ 3. Add rules, skills, agents, MCPs or plugins based on your needs for each tool.
 
 ◇ Available Commands
-│ npx mvagnon-agents <path>    Bootstrap a project with AI tool configs
 │ npx mvagnon-agents manage    Add tools, rules, skills or agents to an existing project
 │ npx mvagnon-agents upgrade   Sync generic resources with the latest package version
-│ npx mvagnon-agents keys      Manage API keys for future bootstraps (~/.config/mvagnon/agents/)
 
 Done
 ```
@@ -145,10 +138,8 @@ config/
 
 bootstrap.mjs                                     # Interactive setup script
 lib/
-├── sync.mjs                                      # Stable base path for API keys
 ├── manage.mjs                                    # Manage subcommand
-├── apikeys.mjs                                   # API key storage & placeholder replacement
-└── keys.mjs                                      # Keys subcommand
+└── manifest.mjs                                  # Manifest read/write helpers
 ```
 
 ### How It Works
@@ -179,7 +170,7 @@ Tool directories (`.claude/rules/`, `.cursor/rules/`, etc.) contain relative sym
 
 ### Configuration Storage
 
-API keys are stored in `~/.config/mvagnon/agents/config.json`. This is the only persistent data stored outside the project — configuration files are read directly from the package at runtime.
+MCP config files use native environment variable syntax (e.g. `${CONTEXT7_API_KEY}`). No secrets are stored outside the project — set the required env vars in your shell profile.
 
 ## Recommended Claude Code Hooks
 
@@ -228,4 +219,5 @@ If you prefer not to use the bootstrap script:
 
 1. Copy the `config/` folder contents to your project
 2. Rename files according to your target tool (see Supported Tools table)
-3. Update `.gitignore` as needed
+3. Set the required environment variables (e.g. `CONTEXT7_API_KEY`)
+4. Update `.gitignore` as needed

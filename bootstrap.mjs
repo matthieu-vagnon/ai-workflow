@@ -4,12 +4,6 @@ import * as p from "@clack/prompts";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  loadApiKeys,
-  replacePlaceholders,
-  saveApiKeys,
-  scanPlaceholders,
-} from "./lib/apikeys.mjs";
 import { readManifest, writeManifest } from "./lib/manifest.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -32,7 +26,8 @@ const TOOLS = {
     },
     rootFiles: { "AGENTS.md": "CLAUDE.md" },
     configFiles: { "claudecode.settings.json": ".mcp.json" },
-    gitignoreEntries: [".claude", "CLAUDE.md", ".mcp.json"],
+    gitignoreEntries: [".claude", "CLAUDE.md"],
+    configGitignoreEntries: [".mcp.json"],
   },
 
   opencode: {
@@ -46,7 +41,8 @@ const TOOLS = {
     },
     rootFiles: { "AGENTS.md": "AGENTS.md" },
     configFiles: { "opencode.settings.json": "opencode.json" },
-    gitignoreEntries: [".opencode", "AGENTS.md", "opencode.json"],
+    gitignoreEntries: [".opencode", "AGENTS.md"],
+    configGitignoreEntries: ["opencode.json"],
   },
 
   cursor: {
@@ -61,6 +57,7 @@ const TOOLS = {
     rootFiles: {},
     configFiles: { "cursor.mcp.json": ".cursor/mcp.json" },
     gitignoreEntries: [".cursor"],
+    configGitignoreEntries: [".cursor/mcp.json"],
   },
 
   codex: {
@@ -73,6 +70,7 @@ const TOOLS = {
     rootFiles: { "AGENTS.md": "AGENTS.md" },
     configFiles: { "codex.config.toml": ".codex/config.toml" },
     gitignoreEntries: [".codex", ".agents", "AGENTS.md"],
+    configGitignoreEntries: [".codex/config.toml"],
   },
 };
 
@@ -146,16 +144,10 @@ async function main() {
     });
   }
 
-  if (targetArg === "keys") {
-    const { runKeys } = await import("./lib/keys.mjs");
-    return runKeys({ VERSION });
-  }
-
   if (!targetArg) {
     console.error("Usage: npx mvagnon-agents <target-path>");
     console.error("       npx mvagnon-agents upgrade");
     console.error("       npx mvagnon-agents manage");
-    console.error("       npx mvagnon-agents keys");
     process.exit(1);
   }
 
@@ -288,37 +280,6 @@ async function main() {
     process.exit(0);
   }
 
-  // Step 6: API keys — scan config files for placeholders, prompt for missing keys
-  const configFilePaths = [];
-  for (const tool of selectedTools) {
-    for (const src of Object.keys(tool.configFiles)) {
-      configFilePaths.push(path.join(CONFIG_DIR, src));
-    }
-  }
-  const neededKeys = scanPlaceholders(configFilePaths);
-  const apiKeys = loadApiKeys();
-  let newKeysAdded = false;
-
-  if (neededKeys.size > 0) {
-    for (const name of neededKeys) {
-      if (apiKeys[name]) continue;
-      const value = await p.password({
-        message: `API key for ${name} (empty to skip)`,
-      });
-      if (p.isCancel(value)) {
-        p.cancel("Setup cancelled");
-        process.exit(0);
-      }
-      if (value) {
-        apiKeys[name] = value;
-        newKeysAdded = true;
-      }
-    }
-    if (newKeysAdded) {
-      saveApiKeys(apiKeys);
-    }
-  }
-
   const s = p.spinner();
   s.start("Copying files + creating relative links");
 
@@ -376,10 +337,15 @@ async function main() {
       if (fs.existsSync(srcPath)) {
         const destPath = path.join(targetPath, dest);
         fs.mkdirSync(path.dirname(destPath), { recursive: true });
-        await copyConfigWithReplacements(srcPath, destPath, apiKeys, {
+        await copyWithConfirm(srcPath, destPath, {
           spinner: s,
           projectRoot: targetPath,
         });
+        // Also copy template to .mvagnon-agents/ as example
+        const intermediateRoot = path.join(targetPath, INTERMEDIATE_DIR);
+        fs.mkdirSync(intermediateRoot, { recursive: true });
+        const examplePath = path.join(intermediateRoot, src);
+        copyPath(srcPath, examplePath);
       }
     }
 
@@ -394,7 +360,10 @@ async function main() {
         ? `Agents: ${stats.agents} linked`
         : null,
       ...Object.values(tool.rootFiles).map((f) => `${f}: linked`),
-      ...Object.values(tool.configFiles).map((f) => `${f}: copied`),
+      ...Object.values(tool.configFiles).map((f) => `${f}: copied (gitignored)`),
+      ...Object.keys(tool.configFiles).map(
+        (f) => `${INTERMEDIATE_DIR}/${f}: .example copied`,
+      ),
       addGitignore
         ? `.gitignore: entries added`
         : `.gitignore: exceptions added`,
@@ -427,17 +396,33 @@ async function main() {
     }
   }
 
-  // Check for unresolved placeholders
-  const unresolvedKeys = [...neededKeys].filter((k) => !apiKeys[k]);
-
   const nextSteps = [];
   let stepNum = 1;
 
-  if (unresolvedKeys.length > 0) {
-    nextSteps.push(
-      `${stepNum}. Add your ${unresolvedKeys.join(", ")} API key(s) via: npx mvagnon-agents keys`,
-    );
-    stepNum++;
+  // Config file setup step: list copy commands and required env vars
+  const configSteps = [];
+  for (const tool of selectedTools) {
+    for (const [src, dest] of Object.entries(tool.configFiles)) {
+      const templatePath = path.join(CONFIG_DIR, src);
+      if (!fs.existsSync(templatePath)) continue;
+      const envVars = scanEnvVars(templatePath);
+      configSteps.push({ src, dest, envVars });
+    }
+  }
+  if (configSteps.length > 0) {
+    const allEnvVars = new Set();
+    for (const { envVars } of configSteps) {
+      for (const v of envVars) allEnvVars.add(v);
+    }
+    if (allEnvVars.size > 0) {
+      nextSteps.push(
+        `${stepNum}. Set the following environment variables for MCP config:`,
+      );
+      for (const v of allEnvVars) {
+        nextSteps.push(`   export ${v}=<your-key>`);
+      }
+      stepNum++;
+    }
   }
 
   if (projectSensitiveFiles.length > 0) {
@@ -480,7 +465,6 @@ async function main() {
   const commands = [
     "npx mvagnon-agents manage    Add tools, rules, skills or agents to an existing project",
     "npx mvagnon-agents upgrade   Sync generic resources with the latest package version",
-    "npx mvagnon-agents keys      Manage API keys for future bootstraps (~/.config/mvagnon/agents/)",
   ];
   p.note(commands.join("\n"), "Available Commands");
 
@@ -653,41 +637,15 @@ async function copyWithConfirm(source, target, { spinner, projectRoot } = {}) {
   return true;
 }
 
-async function copyConfigWithReplacements(
-  source,
-  target,
-  apiKeys,
-  { spinner, projectRoot } = {},
-) {
-  if (fs.existsSync(target)) {
-    try {
-      if (!fs.lstatSync(target).isSymbolicLink()) {
-        const label = projectRoot
-          ? path.relative(projectRoot, target)
-          : path.basename(target);
-        if (spinner) spinner.stop("Existing file found");
-        const overwrite = await p.confirm({
-          message: `${label} already exists. Overwrite?`,
-          initialValue: false,
-        });
-        if (p.isCancel(overwrite)) {
-          p.cancel("Setup cancelled");
-          process.exit(0);
-        }
-        if (spinner) spinner.start("Continuing setup");
-        if (!overwrite) return false;
-      }
-    } catch {
-      // lstat failed, proceed with copy
-    }
+function scanEnvVars(filePath) {
+  const content = fs.readFileSync(filePath, "utf-8");
+  const vars = new Set();
+  const pattern = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
+  let match;
+  while ((match = pattern.exec(content)) !== null) {
+    vars.add(match[1]);
   }
-
-  const content = fs.readFileSync(source, "utf-8");
-  const replaced = replacePlaceholders(content, apiKeys);
-  removePath(target);
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(target, replaced, "utf-8");
-  return true;
+  return vars;
 }
 
 function removePath(target) {
@@ -733,9 +691,10 @@ function updateGitignore(targetPath, tool, exceptions = false) {
   const entries = exceptions
     ? tool.gitignoreEntries.map((e) => `!${e}`)
     : tool.gitignoreEntries;
+  const configEntries = tool.configGitignoreEntries || [];
 
   content += sectionHeader + "\n";
-  content += entries.join("\n") + "\n";
+  content += [...entries, ...configEntries].join("\n") + "\n";
 
   fs.writeFileSync(gitignorePath, content);
 }
