@@ -788,7 +788,7 @@ function upgradeLocalIntermediateDir(localDir) {
     }
   }
 
-  // Add/update .example config files from TOOLS definitions
+  // Update existing .example config files from TOOLS definitions
   for (const tool of Object.values(TOOLS)) {
     for (const [src, dest] of Object.entries(tool.configFiles)) {
       const sourcePath = path.join(CONFIG_DIR, src);
@@ -797,8 +797,7 @@ function upgradeLocalIntermediateDir(localDir) {
       const exampleName = path.basename(dest) + ".example";
       const localPath = path.join(localDir, exampleName);
       if (!fs.existsSync(localPath)) {
-        fs.copyFileSync(sourcePath, localPath);
-        updated.push(exampleName);
+        continue;
       } else if (syncFile(sourcePath, localPath)) {
         updated.push(exampleName);
       }
