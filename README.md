@@ -10,6 +10,18 @@
 
 Shared configuration and conventions to bootstrap AI coding assistants. One repo, one command — every tool gets the same rules, skills, and MCP servers.
 
+## Global MCP Stack
+
+Every bootstrapped project ships with three MCP servers configured for all supported tools:
+
+| MCP Server | Purpose              | Provider                                                                                                             |
+| ---------- | -------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| GitHub     | Version management   | [GitHub Copilot MCP](https://api.githubcopilot.com/mcp)                                                              |
+| Context7   | Documentation lookup | [Context7](https://mcp.context7.com/mcp)                                                                             |
+| Brave      | Web browsing         | [@modelcontextprotocol/server-brave-search](https://www.npmjs.com/package/@modelcontextprotocol/server-brave-search) |
+
+MCP config templates are generated per tool (see Configuration Storage below). Copy the `.example` file and replace API key placeholders with your actual keys.
+
 ## Supported Tools
 
 | Tool        | Rules              | Skills / Agents                           | Root File   | MCP Config           |
@@ -126,8 +138,8 @@ config/
 │   │   ├── documentation-writer/                 # Documentation writing skill
 │   │   └── docs-lookup/                          # External library docs lookup
 │   └── dep-sensitive/
-│       └── Playwright MCP/
-│           └── ui-check/                         # UI verification via Playwright
+│       └── Chrome Dev Tools MCP/
+│           └── browser-check/                    # UI verification via Chrome DevTools
 ├── agents/                                       # Reserved (empty)
 ├── AGENTS.md                                     # Master rules for all agents
 ├── claudecode.settings.json                      # Claude Code MCP config
